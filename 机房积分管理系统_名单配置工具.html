@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>积分系统 · 名单配置工具</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #09090f; --surface: #12111e; --card: #1c1a2e; --card2: #221f38;
+  --border: rgba(255,255,255,0.07); --text: #f0eeff; --muted: #8b89a8;
+  --green: #4ade80; --red: #f87171; --yellow: #facc15;
+  --blue: #60a5fa; --purple: #a78bfa; --radius: 14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse 60% 50% at 10% 10%, rgba(96,63,255,0.10) 0%, transparent 70%),
+              radial-gradient(ellipse 50% 40% at 90% 80%, rgba(56,189,248,0.07) 0%, transparent 70%);
+}
+.app { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; padding: 28px 22px 80px; }
+
+header { display: flex; align-items: center; gap: 14px; margin-bottom: 32px; }
+.logo-badge {
+  width: 46px; height: 46px; border-radius: 13px; flex-shrink: 0;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+  box-shadow: 0 6px 20px rgba(99,102,241,0.35);
+}
+.hdr-text h1 { font-size: 20px; font-weight: 900; }
+.hdr-text h1 span { color: var(--purple); }
+.hdr-text p { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+/* Steps */
+.steps-row { display: flex; gap: 10px; margin-bottom: 28px; }
+.step-chip {
+  flex: 1; background: var(--card); border: 1px solid var(--border);
+  border-radius: 11px; padding: 12px 14px; display: flex; align-items: center; gap: 9px;
+  transition: border-color 0.2s;
+}
+.step-chip.done { border-color: rgba(74,222,128,0.4); }
+.step-chip.active { border-color: rgba(139,92,246,0.5); }
+.step-num {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  background: var(--card2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 900; color: var(--muted);
+}
+.step-chip.done .step-num { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.4); color: var(--green); }
+.step-chip.active .step-num { background: rgba(99,102,241,0.2); border-color: rgba(139,92,246,0.5); color: var(--purple); }
+.step-info p { font-size: 12px; font-weight: 800; }
+.step-info span { font-size: 11px; color: var(--muted); }
+
+/* Cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin-bottom: 18px; }
+.card-hdr { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
+.card-icon { font-size: 20px; line-height: 1; margin-top: 1px; }
+.card-hdr h2 { font-size: 14px; font-weight: 900; }
+.card-hdr p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* Drop zone */
+.dropzone {
+  border: 2px dashed rgba(139,92,246,0.35); border-radius: 11px;
+  padding: 32px 22px; text-align: center; cursor: pointer;
+  transition: all 0.2s; background: rgba(99,102,241,0.04); position: relative;
+}
+.dropzone:hover, .dropzone.drag { border-color: rgba(139,92,246,0.7); background: rgba(99,102,241,0.10); }
+.dropzone.loaded { border-color: rgba(74,222,128,0.5); background: rgba(74,222,128,0.05); border-style: solid; }
+.dropzone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.dz-icon { font-size: 32px; margin-bottom: 10px; }
+.dz-title { font-size: 14px; font-weight: 800; margin-bottom: 4px; }
+.dz-sub { font-size: 12px; color: var(--muted); }
+.dz-loaded { font-size: 13px; font-weight: 800; color: var(--green); margin-top: 8px; }
+.dz-change { font-size: 11px; color: var(--muted); margin-top: 4px; text-decoration: underline; cursor: pointer; }
+
+/* Hint */
+.hint {
+  background: var(--card); border-radius: 10px; padding: 12px 14px;
+  margin-top: 14px; border: 1px solid var(--border);
+}
+.hint h4 { font-size: 12px; font-weight: 800; color: var(--yellow); margin-bottom: 7px; }
+.hint li { font-size: 12px; color: var(--muted); line-height: 1.8; margin-left: 16px; }
+.hint li b { color: var(--text); }
+
+/* Buttons */
+.dl-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 15px; border-radius: 9px; border: 1px solid rgba(96,165,250,0.4);
+  background: rgba(96,165,250,0.08); color: var(--blue);
+  font-size: 12px; font-weight: 800; cursor: pointer; margin-top: 12px;
+  font-family: inherit; transition: all 0.15s;
+}
+.dl-btn:hover { background: rgba(96,165,250,0.18); }
+
+/* Preview */
+.class-tabs-wrap { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.ctab {
+  padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700;
+  cursor: pointer; border: 1px solid var(--border); background: var(--card);
+  color: var(--muted); transition: all 0.12s; font-family: inherit;
+}
+.ctab.active { background: rgba(99,102,241,0.2); color: #c4b5fd; border-color: rgba(139,92,246,0.4); }
+.ctab .cnt { font-size: 10px; opacity: 0.7; }
+.seat-preview {
+  background: var(--card); border-radius: 11px; padding: 14px;
+  border: 1px solid var(--border); overflow-x: auto;
+}
+.sp-grid { display: grid; grid-template-columns: 36px repeat(6, 1fr); gap: 4px; min-width: 400px; }
+.sp-hdr { text-align: center; font-size: 10px; font-weight: 800; color: var(--muted); padding: 4px; }
+.sp-seat {
+  height: 46px; border-radius: 7px; border: 1.5px solid var(--border);
+  background: var(--surface); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
+}
+.sp-seat.occ { background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.25); }
+.sp-seat.emp { background: transparent; border-style: dashed; border-color: rgba(255,255,255,0.04); }
+.sp-lbl { font-size: 9px; color: var(--muted); font-weight: 700; }
+.sp-name { font-size: 11px; font-weight: 700; }
+.sp-row-lbl { display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: var(--muted); }
+.sp-podium {
+  grid-column: 2 / 8; background: linear-gradient(135deg, rgba(99,102,241,0.14), rgba(168,85,247,0.09));
+  border: 1px solid rgba(139,92,246,0.3); border-radius: 7px;
+  text-align: center; padding: 7px; font-size: 12px; font-weight: 800; color: #a78bfa; margin-top: 6px;
+}
+.stats-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.stat-badge { padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; background: var(--card); border: 1px solid var(--border); }
+.stat-badge b { color: var(--purple); }
+
+/* Layout config */
+.layout-config-row {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  padding: 12px 16px; background: var(--card); border-radius: 10px;
+  border: 1px solid var(--border); margin-bottom: 18px;
+}
+.layout-config-row label { font-size: 12px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.layout-cfg-select {
+  background: var(--card2); border: 1px solid rgba(139,92,246,0.4); color: var(--text);
+  border-radius: 8px; padding: 6px 10px; font-size: 13px; font-family: inherit;
+  outline: none; cursor: pointer; font-weight: 700;
+}
+.layout-cfg-select:focus { border-color: #818cf8; }
+.layout-preview-tag {
+  font-size: 11px; color: #a78bfa; background: rgba(99,102,241,0.12);
+  border: 1px solid rgba(99,102,241,0.25); border-radius: 6px;
+  padding: 3px 10px; font-weight: 700; white-space: nowrap;
+}
+
+/* Mode toggle */
+.mode-row { display: flex; gap: 10px; margin-bottom: 18px; }.mode-btn {
+  flex: 1; padding: 12px; border-radius: 11px; border: 1.5px solid var(--border);
+  background: var(--card); color: var(--muted); font-size: 13px; font-weight: 800;
+  cursor: pointer; font-family: inherit; transition: all 0.15s; text-align: center;
+}
+.mode-btn.active { border-color: rgba(139,92,246,0.5); background: rgba(99,102,241,0.15); color: #c4b5fd; }
+.mode-desc { font-size: 11px; font-weight: 400; color: var(--muted); display: block; margin-top: 3px; }
+
+/* Manual editor */
+.class-editor-wrap { display: flex; flex-direction: column; gap: 10px; }
+.class-editor-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 11px;
+  overflow: hidden;
+}
+.cec-hdr {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: var(--card2); border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.cec-hdr h3 { font-size: 13px; font-weight: 900; flex: 1; }
+.cec-toggle { font-size: 11px; color: var(--muted); }
+.cec-body { padding: 14px; display: none; }
+.cec-body.open { display: block; }
+.seat-edit-grid {
+  display: grid; grid-template-columns: 36px repeat(6, 1fr);
+  gap: 5px; margin-bottom: 8px;
+}
+.seg-hdr { text-align: center; font-size: 11px; font-weight: 800; color: var(--muted); padding: 2px; }
+.seg-row-lbl { display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--muted); font-weight: 700; }
+.seg-input {
+  background: var(--card2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 7px; padding: 4px 6px; font-size: 12px; font-family: inherit;
+  outline: none; width: 100%; text-align: center; min-width: 0;
+}
+.seg-input:focus { border-color: #818cf8; }
+.seg-input.empty-seat { background: transparent; border-color: transparent; color: var(--muted); font-style: italic; }
+.cec-classname-input {
+  background: var(--card2); border: 1px solid #818cf8; color: var(--text);
+  border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 700;
+  font-family: inherit; outline: none; width: 100%; margin-bottom: 12px;
+}
+.add-class-btn {
+  padding: 10px; border-radius: 10px; border: 1.5px dashed rgba(139,92,246,0.5);
+  background: rgba(99,102,241,0.06); color: #a78bfa; font-size: 13px; font-weight: 800;
+  cursor: pointer; font-family: inherit; width: 100%; transition: all 0.15s;
+}
+.add-class-btn:hover { background: rgba(99,102,241,0.14); }
+.del-class-btn {
+  background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3);
+  color: var(--red); border-radius: 7px; padding: 4px 10px; cursor: pointer;
+  font-size: 12px; font-family: inherit; flex-shrink: 0;
+}
+.row-count-select {
+  background: var(--card2); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 7px; padding: 4px 8px; font-size: 11px; font-family: inherit; outline: none;
+  margin-bottom: 10px;
+}
+
+/* Generate */
+.gen-area { text-align: center; margin-top: 24px; }
+.gen-btn {
+  padding: 15px 38px; border-radius: 13px; border: none; font-size: 15px;
+  font-weight: 900; cursor: pointer; font-family: inherit;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff; box-shadow: 0 6px 28px rgba(99,102,241,0.4);
+  transition: all 0.2s; display: inline-flex; align-items: center; gap: 9px;
+}
+.gen-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 38px rgba(99,102,241,0.55); }
+.gen-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+.gen-sub { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  background: var(--card2); border: 1px solid var(--border);
+  padding: 11px 20px; border-radius: 11px; font-size: 13px; font-weight: 700;
+  z-index: 9999; white-space: nowrap; box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  animation: toastIn 0.3s ease;
+}
+@keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+
+@media (max-width: 580px) { .steps-row { flex-direction: column; } .mode-row { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo-badge">🛠️</div>
+    <div class="hdr-text">
+      <h1>积分系统 <span>名单配置工具</span></h1>
+      <p>上传 Excel 名单 或 手动编辑 → 一键生成专属系统，所有功能完整保留</p>
+    </div>
+  </header>
+
+  <!-- Steps -->
+  <div class="steps-row" id="stepsRow">
+    <div class="step-chip active" id="step1chip">
+      <div class="step-num">1</div>
+      <div class="step-info"><p>配置学生名单</p><span>Excel导入 或 手动填写</span></div>
+    </div>
+    <div class="step-chip" id="step2chip">
+      <div class="step-num">2</div>
+      <div class="step-info"><p>上传原系统 HTML</p><span>待替换的积分管理网页</span></div>
+    </div>
+    <div class="step-chip" id="step3chip">
+      <div class="step-num">3</div>
+      <div class="step-info"><p>生成下载</p><span>其他所有功能完整保留</span></div>
+    </div>
+  </div>
+
+  <!-- Step 1: Student list -->
+  <div class="card">
+    <div class="card-hdr">
+      <span class="card-icon">👥</span>
+      <div><h2>Step 1 · 配置学生名单</h2><p>选择导入方式</p></div>
+    </div>
+
+    <!-- Layout config -->
+    <div class="layout-config-row">
+      <span style="font-size:16px;">📐</span>
+      <label>列数（A→?）：</label>
+      <select class="layout-cfg-select" id="cfgCols" onchange="onLayoutChange()">
+        <option value="2">2 列（A–B）</option>
+        <option value="3">3 列（A–C）</option>
+        <option value="4">4 列（A–D）</option>
+        <option value="5">5 列（A–E）</option>
+        <option value="6" selected>6 列（A–F）</option>
+        <option value="7">7 列（A–G）</option>
+        <option value="8">8 列（A–H）</option>
+      </select>
+      <label style="margin-left:8px;">排数上限：</label>
+      <select class="layout-cfg-select" id="cfgRows" onchange="onLayoutChange()">
+        <option value="4">4 排</option>
+        <option value="5">5 排</option>
+        <option value="6">6 排</option>
+        <option value="7">7 排</option>
+        <option value="8" selected>8 排</option>
+        <option value="9">9 排</option>
+        <option value="10">10 排</option>
+        <option value="12">12 排</option>
+        <option value="14">14 排</option>
+        <option value="16">16 排</option>
+      </select>
+      <span class="layout-preview-tag" id="layoutPreviewTag">6列 × 8排 · 最多 48 座</span>
+    </div>
+
+    <div class="mode-row">
+      <button class="mode-btn active" id="modeExcel" onclick="switchMode('excel')">
+        📊 Excel 批量导入
+        <span class="mode-desc">上传填好的名单表格，自动解析所有班级</span>
+      </button>
+      <button class="mode-btn" id="modeManual" onclick="switchMode('manual')">
+        ✏️ 手动编辑
+        <span class="mode-desc">直接在网页上一格一格填写或修改</span>
+      </button>
+    </div>
+
+    <!-- Excel mode -->
+    <div id="excelMode">
+      <div class="dropzone" id="dzExcel">
+        <input type="file" id="excelFile" accept=".xlsx,.xls" onchange="onExcelUpload(event)">
+        <div class="dz-icon">📂</div>
+        <div class="dz-title">点击选择 Excel 文件 / 拖入此处</div>
+        <div class="dz-sub">支持 .xlsx / .xls 格式</div>
+        <div class="dz-loaded" id="excelLoaded" style="display:none"></div>
+        <div class="dz-change" id="excelChange" style="display:none">点击重新选择</div>
+      </div>
+      <div class="hint">
+        <h4>📐 Excel 格式</h4>
+        <ul>
+          <li><b>工作表名</b> = 班级名称（例：初2028届(2)班）</li>
+          <li><b>第1行</b>：标题行 — 留空 | A列 | B列 | C列 | D列 | E列 | F列</li>
+          <li><b>第2行起</b>：各排座位，第1行=前排，第8/9行=最后排</li>
+          <li>空位留空，系统自动识别</li>
+        </ul>
+      </div>
+      <button class="dl-btn" onclick="downloadTemplate()">⬇️ 下载名单模板 Excel</button>
+    </div>
+
+    <!-- Manual mode -->
+    <div id="manualMode" style="display:none">
+      <div class="class-editor-wrap" id="classEditorWrap"></div>
+      <button class="add-class-btn" onclick="addManualClass()">＋ 添加新班级</button>
+    </div>
+  </div>
+
+  <!-- Preview (shown when classes are loaded) -->
+  <div class="card" id="cardPreview" style="display:none">
+    <div class="card-hdr">
+      <span class="card-icon">👁</span>
+      <div><h2>名单预览</h2><p>确认座位信息无误后进入下一步</p></div>
+    </div>
+    <div class="stats-row" id="previewStats"></div>
+    <div class="class-tabs-wrap" id="previewTabs"></div>
+    <div class="seat-preview"><div class="sp-grid" id="seatPreviewGrid"></div></div>
+  </div>
+
+  <!-- Step 2: HTML -->
+  <div class="card" id="cardHtml">
+    <div class="card-hdr">
+      <span class="card-icon">🌐</span>
+      <div><h2>Step 2 · 上传原系统 HTML</h2><p>上传积分管理系统的网页文件</p></div>
+    </div>
+    <div class="dropzone" id="dzHtml">
+      <input type="file" id="htmlFile" accept=".html,.htm" onchange="onHtmlUpload(event)">
+      <div class="dz-icon">🌐</div>
+      <div class="dz-title">点击选择 HTML 文件 / 拖入此处</div>
+      <div class="dz-sub">支持 .html / .htm 格式</div>
+      <div class="dz-loaded" id="htmlLoaded" style="display:none"></div>
+      <div class="dz-change" id="htmlChange" style="display:none">点击重新选择</div>
+    </div>
+    <div class="hint">
+      <h4>ℹ️ 说明</h4>
+      <ul>
+        <li>只替换学生名单数据（<b>SEAT_DATA</b>），<b>积分记录、作业管理、课程进度、随机点名等功能完整保留</b></li>
+        <li>原文件不会被修改，下载的是新生成的副本</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Step 3: Generate -->
+  <div class="gen-area">
+    <button class="gen-btn" id="genBtn" onclick="generate()" disabled>⚡ 生成专属系统</button>
+    <div class="gen-sub" id="genSub">请先完成上方两个步骤</div>
+  </div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────
+let parsedClasses = {};      // { className: { seatKey: name } }
+let htmlContent   = '';
+let currentMode   = 'excel'; // 'excel' | 'manual'
+let activePreviewClass = null;
+
+// Manual editor state: array of { id, name, rows, seats:{key:name} }
+let manualClasses = [];
+let manualIdCounter = 0;
+
+// Layout config
+let cfgNumCols = 6;
+let cfgNumRows = 8;
+const ALL_COLS = ['A','B','C','D','E','F','G','H'];
+function getSeatCols() { return ALL_COLS.slice(0, cfgNumCols); }
+
+function onLayoutChange() {
+  cfgNumCols = parseInt(document.getElementById('cfgCols').value) || 6;
+  cfgNumRows = parseInt(document.getElementById('cfgRows').value) || 8;
+  // Update preview tag
+  const maxSeats = cfgNumCols * cfgNumRows;
+  document.getElementById('layoutPreviewTag').textContent =
+    `${cfgNumCols}列 × ${cfgNumRows}排 · 最多 ${maxSeats} 座`;
+  // Re-render manual editor if open
+  if (currentMode === 'manual') renderManualEditor();
+  syncParsedFromMode();
+  updatePreview();
+}
+
+// ─── Mode switching ────────────────────────────────────────────────
+function switchMode(m) {
+  currentMode = m;
+  document.getElementById('modeExcel').classList.toggle('active', m==='excel');
+  document.getElementById('modeManual').classList.toggle('active', m==='manual');
+  document.getElementById('excelMode').style.display = m==='excel' ? '' : 'none';
+  document.getElementById('manualMode').style.display = m==='manual' ? '' : 'none';
+  if (m === 'manual') {
+    // seed manual editor with current parsedClasses if any
+    if (Object.keys(parsedClasses).length > 0 && manualClasses.length === 0) {
+      seedManualFromParsed();
+    } else if (manualClasses.length === 0) {
+      addManualClass();
+    }
+    renderManualEditor();
+  }
+  syncParsedFromMode();
+}
+
+function syncParsedFromMode() {
+  if (currentMode === 'manual') {
+    parsedClasses = collectManualData();
+  }
+  updatePreview();
+  checkCanGenerate();
+}
+
+// ─── Drag & Drop ─────────────────────────────────────────────────
+['dzExcel','dzHtml'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drag'));
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.classList.remove('drag');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (id === 'dzExcel') processExcel(file);
+    else processHtml(file);
+  });
+});
+
+// ─── Excel Upload ──────────────────────────────────────────────────
+function onExcelUpload(evt) { processExcel(evt.target.files[0]); }
+
+function processExcel(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      parsedClasses = {};
+      wb.SheetNames.forEach(sheetName => {
+        if (/说明|intro|readme|模板|template/i.test(sheetName)) return;
+        const ws = wb.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (!data || data.length < 2) return;
+        const header = (data[0] || []).map(h => String(h).replace(/列/g,'').trim().toUpperCase());
+        const seatCols = getSeatCols();
+        const colMap = {};
+        seatCols.forEach(col => {
+          const idx = header.indexOf(col);
+          if (idx !== -1) colMap[col] = idx;
+        });
+        if (Object.keys(colMap).length === 0) {
+          seatCols.forEach((col, i) => { colMap[col] = i + 1; });
+        }
+        const seats = {};
+        for (let ri = 1; ri < data.length; ri++) {
+          const row = data[ri];
+          let rowNum = ri;
+          const firstCell = String(row[0] || '').replace(/[^0-9]/g,'');
+          if (firstCell && parseInt(firstCell) > 0) rowNum = parseInt(firstCell);
+          seatCols.forEach(col => {
+            const colIdx = colMap[col];
+            if (colIdx === undefined) return;
+            const name = String(row[colIdx] || '').trim();
+            if (name) seats[`${col}${rowNum}`] = name;
+          });
+        }
+        if (Object.keys(seats).length > 0) parsedClasses[sheetName] = seats;
+      });
+      if (Object.keys(parsedClasses).length === 0) { showToast('⚠️ 未找到有效班级数据，请检查 Excel 格式'); return; }
+      document.getElementById('dzExcel').classList.add('loaded');
+      const total = Object.values(parsedClasses).reduce((s,v)=>s+Object.keys(v).length,0);
+      document.getElementById('excelLoaded').style.display = 'block';
+      document.getElementById('excelLoaded').textContent = `✅ 已加载 ${Object.keys(parsedClasses).length} 个班级，共 ${total} 名学生`;
+      document.getElementById('excelChange').style.display = 'block';
+      markStep(1,'done'); updatePreview(); checkCanGenerate();
+    } catch(err) { showToast('❌ Excel 解析失败：' + err.message); console.error(err); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ─── Manual Editor ─────────────────────────────────────────────────
+function addManualClass(name, seats, rows) {
+  const id = ++manualIdCounter;
+  manualClasses.push({ id, name: name||'', rows: rows||cfgNumRows, seats: seats||{} });
+  renderManualEditor();
+}
+
+function removeManualClass(id) {
+  manualClasses = manualClasses.filter(c => c.id !== id);
+  renderManualEditor();
+  syncParsedFromMode();
+}
+
+function seedManualFromParsed() {
+  manualClasses = Object.entries(parsedClasses).map(([name, seats]) => {
+    const maxR = Math.max(8, ...Object.keys(seats).map(k=>parseInt(k.slice(1))||0));
+    return { id: ++manualIdCounter, name, rows: maxR, seats };
+  });
+}
+
+function collectManualData() {
+  const out = {};
+  document.querySelectorAll('.manual-class-block').forEach(block => {
+    const id = parseInt(block.dataset.id);
+    const cls = manualClasses.find(c => c.id === id);
+    if (!cls) return;
+    const nameInput = block.querySelector('.cec-classname-input');
+    const className = nameInput ? nameInput.value.trim() : cls.name;
+    if (!className) return;
+    const seats = {};
+    block.querySelectorAll('.seg-input[data-key]').forEach(inp => {
+      const val = inp.value.trim();
+      if (val) seats[inp.dataset.key] = val;
+    });
+    if (Object.keys(seats).length > 0) out[className] = seats;
+  });
+  return out;
+}
+
+function renderManualEditor() {
+  const wrap = document.getElementById('classEditorWrap');
+  wrap.innerHTML = manualClasses.map(cls => {
+    const rows = cls.rows || 8;
+    let gridRows = '';
+    // header row
+    gridRows += `<div class="seg-hdr"></div>`;
+    getSeatCols().forEach(col => gridRows += `<div class="seg-hdr">${col}列</div>`);
+    // seat rows (front=1 to back=rows)
+    for (let r = rows; r >= 1; r--) {
+      gridRows += `<div class="seg-row-lbl">${r}排</div>`;
+      getSeatCols().forEach(col => {
+        const key = `${col}${r}`;
+        const val = (cls.seats && cls.seats[key]) || '';
+        gridRows += `<input class="seg-input${val?'':' empty-seat'}" data-key="${key}"
+          value="${escHtml(val)}" placeholder="空位"
+          oninput="onManualInput(this,${cls.id},'${key}')"
+          onfocus="this.classList.remove('empty-seat')"
+          onblur="if(!this.value)this.classList.add('empty-seat')"
+        >`;
+      });
+    }
+    return `<div class="class-editor-card manual-class-block" data-id="${cls.id}">
+      <div class="cec-hdr" onclick="toggleCecBody(${cls.id})">
+        <h3>${cls.name || '（未命名班级）'}</h3>
+        <span class="cec-toggle">▼ 展开/收起</span>
+        <button class="del-class-btn" onclick="event.stopPropagation();removeManualClass(${cls.id})">✕ 删除</button>
+      </div>
+      <div class="cec-body" id="cec-body-${cls.id}">
+        <input class="cec-classname-input" placeholder="班级名称（如：初2028届(2)班）"
+          value="${escHtml(cls.name)}"
+          oninput="onManualClassName(${cls.id},this.value)">
+        <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:12px;color:var(--muted)">排数：</span>
+          <select class="row-count-select" onchange="onManualRowsChange(${cls.id},this.value)">
+            ${[4,5,6,7,8,9,10,11,12,13,14,15,16].map(n=>`<option value="${n}" ${n===rows?'selected':''}>${n}排</option>`).join('')}
+          </select>
+        </div>
+        <div class="seat-edit-grid" style="grid-template-columns:36px repeat(${cfgNumCols},1fr)">${gridRows}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCecBody(id) {
+  const el = document.getElementById('cec-body-' + id);
+  if (el) el.classList.toggle('open');
+}
+
+function onManualInput(inp, id, key) {
+  const cls = manualClasses.find(c=>c.id===id);
+  if (!cls) return;
+  if (!cls.seats) cls.seats = {};
+  const v = inp.value.trim();
+  if (v) cls.seats[key] = v; else delete cls.seats[key];
+  syncParsedFromMode();
+}
+
+function onManualClassName(id, val) {
+  const cls = manualClasses.find(c=>c.id===id);
+  if (cls) { cls.name = val; syncParsedFromMode(); }
+}
+
+function onManualRowsChange(id, val) {
+  const cls = manualClasses.find(c=>c.id===id);
+  if (cls) { cls.rows = parseInt(val)||8; renderManualEditor(); syncParsedFromMode(); }
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Preview ──────────────────────────────────────────────────────
+function updatePreview() {
+  const classes = Object.keys(parsedClasses);
+  if (classes.length === 0) {
+    document.getElementById('cardPreview').style.display = 'none';
+    return;
+  }
+  document.getElementById('cardPreview').style.display = 'block';
+  if (!activePreviewClass || !parsedClasses[activePreviewClass]) {
+    activePreviewClass = classes[0];
+  }
+  const total = classes.reduce((s,c)=>s+Object.keys(parsedClasses[c]).length,0);
+  document.getElementById('previewStats').innerHTML =
+    `<div class="stat-badge">班级数：<b>${classes.length}</b></div>
+     <div class="stat-badge">总学生：<b>${total}</b> 人</div>
+     <div class="stat-badge">平均每班：<b>${Math.round(total/classes.length)}</b> 人</div>`;
+  document.getElementById('previewTabs').innerHTML = classes.map(c =>
+    `<button class="ctab ${c===activePreviewClass?'active':''}" onclick="previewClass('${c.replace(/'/g,"\\'")}')">
+      ${c.replace('初2028届','').replace('班','班')}
+      <span class="cnt">(${Object.keys(parsedClasses[c]).length}人)</span>
+    </button>`
+  ).join('');
+  renderPreviewGrid(activePreviewClass);
+  if (classes.length > 0) markStep(1,'done');
+}
+
+function previewClass(cls) {
+  activePreviewClass = cls;
+  updatePreview();
+}
+
+function renderPreviewGrid(cls) {
+  const seats = parsedClasses[cls] || {};
+  const seatCols = getSeatCols();
+  const maxRow = Math.max(cfgNumRows, ...Object.keys(seats).map(k=>parseInt(k.slice(1))||0));
+  let html = '';
+  html += '<div class="sp-hdr"></div>';
+  seatCols.forEach(c => html += `<div class="sp-hdr">${c}列</div>`);
+  for (let r = maxRow; r >= 1; r--) {
+    html += `<div class="sp-row-lbl">${r}排</div>`;
+    seatCols.forEach(col => {
+      const key = `${col}${r}`;
+      const name = seats[key] || '';
+      if (name) {
+        html += `<div class="sp-seat occ"><div class="sp-lbl">${key}</div><div class="sp-name">${name}</div></div>`;
+      } else {
+        html += `<div class="sp-seat emp"></div>`;
+      }
+    });
+  }
+  html += `<div class="sp-podium" style="grid-column:2/${seatCols.length+2}">🖥️ 讲台</div>`;
+  const gridEl = document.getElementById('seatPreviewGrid');
+  gridEl.style.gridTemplateColumns = `36px repeat(${seatCols.length}, 1fr)`;
+  gridEl.innerHTML = html;
+}
+
+// ─── HTML Upload ──────────────────────────────────────────────────
+function onHtmlUpload(evt) { processHtml(evt.target.files[0]); }
+
+function processHtml(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    htmlContent = e.target.result;
+    if (!htmlContent.includes('SEAT_DATA')) {
+      showToast('⚠️ 未检测到 SEAT_DATA，请确认是积分管理系统 HTML');
+      htmlContent = ''; return;
+    }
+    document.getElementById('dzHtml').classList.add('loaded');
+    document.getElementById('htmlLoaded').style.display = 'block';
+    document.getElementById('htmlLoaded').textContent = `✅ 已加载：${file.name}`;
+    document.getElementById('htmlChange').style.display = 'block';
+    markStep(2,'done'); checkCanGenerate();
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+// ─── Generate ─────────────────────────────────────────────────────
+function checkCanGenerate() {
+  const hasClasses = Object.keys(parsedClasses).length > 0;
+  const ready = hasClasses && htmlContent.length > 0;
+  document.getElementById('genBtn').disabled = !ready;
+  const cnt = Object.keys(parsedClasses).length;
+  const tot = Object.values(parsedClasses).reduce((s,v)=>s+Object.keys(v).length,0);
+  document.getElementById('genSub').textContent = ready
+    ? `准备就绪：将生成含 ${cnt} 个班级、共 ${tot} 名学生的系统`
+    : (!hasClasses ? '请先配置学生名单' : '请先上传原系统 HTML');
+  if (ready) markStep(3,'active');
+}
+
+function generate() {
+  if (currentMode === 'manual') {
+    parsedClasses = collectManualData();
+  }
+  if (!htmlContent || Object.keys(parsedClasses).length === 0) return;
+  try {
+    // Build SEAT_DATA JS string
+    const entries = Object.entries(parsedClasses).map(([cls, seats]) => {
+      const seatEntries = Object.entries(seats)
+        .map(([k,v]) => `"${k}":"${v.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}"`)
+        .join(', ');
+      return `"${cls.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}": {${seatEntries}}`;
+    });
+    const newSeatData = `const SEAT_DATA = {\n${entries.join(',\n')}\n};`;
+
+    // Build ROOM_COLS injection string
+    const seatCols = getSeatCols();
+    const newRoomCols = `const ROOM_COLS = ${JSON.stringify(seatCols)};`;
+
+    // Replace SEAT_DATA block
+    let replaced = htmlContent.replace(
+      /const SEAT_DATA\s*=\s*\{[\s\S]*?\}\s*;/,
+      newSeatData
+    );
+    if (replaced === htmlContent) {
+      showToast('⚠️ 替换失败：未找到 SEAT_DATA 定义，请确认 HTML 文件正确'); return;
+    }
+
+    // Replace or inject ROOM_COLS (inject right after SEAT_DATA block)
+    if (/const ROOM_COLS\s*=/.test(replaced)) {
+      replaced = replaced.replace(/const ROOM_COLS\s*=\s*\[.*?\]\s*;/, newRoomCols);
+    } else {
+      replaced = replaced.replace(
+        /(const SEAT_DATA\s*=\s*\{[\s\S]*?\}\s*;)/,
+        `$1\n${newRoomCols}`
+      );
+    }
+
+    const blob = new Blob([replaced], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const firstName = Object.keys(parsedClasses)[0] || '班级';
+    const cnt = Object.keys(parsedClasses).length;
+    a.download = `积分系统_${firstName.replace(/[\\/:*?"<>|]/g,'_')}_等${cnt}班.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    markStep(3,'done');
+    showToast(`🎉 生成成功！${cnt} 个班级，${Object.values(parsedClasses).reduce((s,v)=>s+Object.keys(v).length,0)} 名学生`);
+  } catch(err) { showToast('❌ 生成失败：' + err.message); console.error(err); }
+}
+
+// ─── Template Download ────────────────────────────────────────────
+function downloadTemplate() {
+  const seatCols = getSeatCols();
+  const colHeaders = ['', ...seatCols.map(c => c+'列')];
+  const wb = XLSX.utils.book_new();
+  const intro = [
+    ['机房积分系统 · 学生名单填写模板'],[''],
+    ['填写说明'],
+    ['① 每个工作表 = 一个班级，工作表名称 = 班级名称'],
+    [`② 第1行为标题：留空 | ${seatCols.map(c=>c+'列').join(' | ')}`],
+    ['③ 第2行起：第1排学生（前排），往下依次增加排数'],
+    ['④ 空位留空，保存 .xlsx 后上传到配置工具'],
+    [`⑤ 当前布局：${cfgNumCols} 列 × ${cfgNumRows} 排`],
+  ];
+  const wsI = XLSX.utils.aoa_to_sheet(intro);
+  wsI['!cols'] = [{wch:60}];
+  XLSX.utils.book_append_sheet(wb, wsI, '📖 填写说明');
+
+  const sampleNames = [
+    ['李明','王芳','张伟','陈静','刘杰','赵丽','黄峰','林欣'],
+    ['孙浩','周婷','吴磊','郑雪','钱鑫','何敏','徐宇','许洁'],
+    ['朱博','林晓','许洁','胡宇','高峰','马欣','曹阳','韩梅'],
+    ['黄涛','郭梅','罗强','梁燕','程刚','谢娜','邓威','潘玲'],
+    ['曾文','潘怡','萧辉','苏琴','蔡豪','贾莉','龚帅','薛艳'],
+    ['廖炜','方晨','熊倩','龙俊','秦悦','江艳','丁磊','魏晴'],
+    ['韩旭','史桐','邓朗','薛蕊','邱毅','崔菲','余涛','白雪'],
+    ['段博','鲁晖','傅雅','纪聪','戴柳','邵雷','程明','汪琴'],
+    ['莫言','杨帆','贺斌','左萱','侯峰','姜雯','闫刚','卢茜'],
+    ['赵奇','钟悦','项鹏','覃心','尤健','庞洁','翟勇','郝颖'],
+    ['史超','柏宁','宋远','欧阳','凌海','桂香','鲁峰','颜雪'],
+    ['武博','乔敏','常毅','简萍','聂阳','甘桃','卓峰','施琴'],
+    ['房勇','仇颖','汤明','伊娜','祁山','费雯','扈刚','刁莉'],
+    ['屠鑫','党颐','米峰','郑霞','谷磊','满萍','苟峰','舒琴'],
+    ['阮博','晁荟','甄彦','滕雯','迟刚','麦亭','涂峰','邢梅'],
+    ['隗鑫','栾玫','巫雷','郜晓','彭胜','鞠宁','荆飞','昝云'],
+  ];
+  const sample = [colHeaders];
+  for (let r = 0; r < cfgNumRows; r++) {
+    const rowData = sampleNames[r] || [];
+    sample.push([`第${r+1}排`, ...seatCols.map((_,i) => rowData[i] || '')]);
+  }
+  const wsS = XLSX.utils.aoa_to_sheet(sample);
+  wsS['!cols'] = [{wch:8}, ...seatCols.map(()=>({wch:10}))];
+  XLSX.utils.book_append_sheet(wb, wsS, '示例班级（复制此表）');
+
+  const blank = [colHeaders, ...Array.from({length:cfgNumRows},(_,i)=>[`第${i+1}排`,...seatCols.map(()=>'')])] ;
+  const wsB = XLSX.utils.aoa_to_sheet(blank);
+  wsB['!cols'] = [{wch:8}, ...seatCols.map(()=>({wch:10}))];
+  XLSX.utils.book_append_sheet(wb, wsB, '请重命名为班级名');
+
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = `学生名单模板_${cfgNumCols}列${cfgNumRows}排.xlsx`; a.click();
+  URL.revokeObjectURL(url);
+  showToast(`📥 模板已下载（${cfgNumCols}列×${cfgNumRows}排）`);
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────
+function markStep(n, state) {
+  const chip = document.getElementById(`step${n}chip`);
+  chip.className = `step-chip ${state}`;
+  if (state === 'done') chip.querySelector('.step-num').textContent = '✓';
+  else if (state === 'active') chip.querySelector('.step-num').textContent = n;
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  if (toastTimer) clearTimeout(toastTimer);
+  let t = document.querySelector('.toast');
+  if (!t) { t = document.createElement('div'); t.className = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.style.display = 'block';
+  toastTimer = setTimeout(() => { if(t) t.style.display='none'; }, 3500);
+}
+</script>
+</body>
+</html>

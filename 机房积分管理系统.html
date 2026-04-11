@@ -1,0 +1,2043 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>机房积分管理系统</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  /* 深色模式 */
+  --bg: #09090f;
+  --surface: #12111e;
+  --card: #1c1a2e;
+  --card2: #221f38;
+  --border: rgba(255,255,255,0.07);
+  --text: #f0eeff;
+  --muted: #8b89a8;
+  --green: #4ade80;
+  --red: #f87171;
+  --yellow: #facc15;
+  --blue: #60a5fa;
+  --purple: #c084fc;
+  --orange: #fb923c;
+  --radius: 14px;
+}
+
+/* 浅色模式 */
+:root.light {
+  --bg: #F8F9FA;
+  --surface: #FFFFFF;
+  --card: #F1F3F5;
+  --card2: #E9ECEF;
+  --border: rgba(0,0,0,0.1);
+  --text: #212529;
+  --muted: #6C757D;
+  --green: #28A745;
+  --red: #DC3545;
+  --yellow: #FFC107;
+  --blue: #007BFF;
+  --purple: #6F42C1;
+  --orange: #FD7E14;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { 
+  font-family: 'Noto Sans SC', sans-serif; 
+  background: var(--bg); 
+  color: var(--text); 
+  height: 100vh; 
+  overflow: hidden; 
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 所有元素添加过渡效果 */
+.app, header, .classroom-wrap, .seat, .right-panel, .stu-header, .quick-actions, .custom-form, .log-item, .hw-panel, .roll-overlay, .modal, .prog-panel, 
+.stats-bar, .stat-mini, .score-filter, .sf-btn, .legend, .leg, 
+.hw-stat, .hw-seat-btn, .roll-avatar, .roll-name, .roll-pts-badge, 
+.prog-card, .prog-lesson-btn, .prog-bar-fill, .prog-cmp-fill {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* BG */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0;
+  background: radial-gradient(ellipse 60% 50% at 10% 10%, rgba(96,63,255,0.12) 0%, transparent 70%),
+              radial-gradient(ellipse 50% 40% at 90% 80%, rgba(56,189,248,0.08) 0%, transparent 70%);
+  pointer-events: none;
+  transition: background 0.3s ease;
+}
+
+/* 浅色模式背景 */
+:root.light body::before {
+  background: radial-gradient(ellipse 60% 50% at 10% 10%, rgba(96,125,139,0.08) 0%, transparent 70%),
+              radial-gradient(ellipse 50% 40% at 90% 80%, rgba(3,169,244,0.05) 0%, transparent 70%);
+}
+
+.app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100vh; }
+
+/* HEADER */
+header {
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+  background: rgba(18,17,30,0.9); backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  flex-wrap: wrap; min-width: 0;
+  transition: background 0.3s ease;
+}
+
+/* 浅色模式导航栏 */
+:root.light header {
+  background: rgba(255,255,255,0.9); backdrop-filter: blur(20px);
+}
+.logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.logo-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+}
+.logo h1 { font-size: 17px; font-weight: 900; }
+.logo h1 span { color: #a78bfa; }
+
+/* CLASS TABS */
+.class-tabs {
+  display: flex; gap: 4px; overflow-x: auto; flex: 1; min-width: 0;
+  scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.45) transparent;
+  padding: 2px 2px 6px 2px;
+}
+.class-tabs::-webkit-scrollbar { display: block; height: 4px; }
+.class-tabs::-webkit-scrollbar-track { background: transparent; }
+.class-tabs::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.4); border-radius: 2px; }
+.class-tab {
+  padding: 7px 14px; border-radius: 9px; font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; transition: all 0.15s;
+  border: 1px solid transparent; color: var(--muted); background: transparent;
+}
+.class-tab:hover { color: var(--text); background: var(--card); }
+.class-tab.active {
+  background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(168,85,247,0.2));
+  color: #c4b5fd; border-color: rgba(139,92,246,0.4);
+}
+
+/* HEADER ACTIONS */
+.hdr-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+.hdr-btn {
+  display: flex; align-items: center; gap: 5px; padding: 7px 11px;
+  border-radius: 9px; border: 1px solid var(--border); background: var(--card);
+  color: var(--text); font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: all 0.15s; font-family: inherit; white-space: nowrap;
+}
+.hdr-btn:hover { border-color: rgba(139,92,246,0.5); background: var(--card2); }
+.hdr-btn.green { border-color: rgba(74,222,128,0.4); color: var(--green); background: rgba(74,222,128,0.08); }
+.hdr-btn.green:hover { background: rgba(74,222,128,0.15); }
+
+/* MAIN LAYOUT */
+main { display: flex; flex: 1; overflow: hidden; min-width: 0; min-height: 0; }
+
+/* LEFT PANEL - Seating */
+.seat-panel {
+  flex: 1; overflow-y: auto; overflow-x: auto; padding: 80px 20px 16px 20px;
+  display: flex; flex-direction: column; gap: 10px;
+  scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.35) transparent;
+  min-width: 0; min-height: 0;
+}
+.seat-panel::-webkit-scrollbar { width: 5px; height: 5px; }
+.seat-panel::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.35); border-radius: 3px; }
+
+/* CLASSROOM LAYOUT */
+.classroom-wrap {
+  background: var(--surface); border-radius: 18px;
+  border: 1px solid var(--border); padding: 14px; overflow: hidden;
+  min-width: 560px;
+}
+
+.room-label {
+  text-align: center; font-size: 11px; font-weight: 700;
+  color: var(--muted); letter-spacing: 2px; text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.podium {
+  background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.15));
+  border: 1px solid rgba(139,92,246,0.3); border-radius: 10px;
+  text-align: center; padding: 6px; font-size: 12px; font-weight: 800;
+  color: #a78bfa; margin-bottom: 12px;
+}
+
+.seat-grid-wrapper {
+  display: flex; gap: 0; align-items: stretch;
+}
+
+/* Row numbers left side */
+.row-nums {
+  display: flex; flex-direction: column; gap: 4px;
+  padding-top: 2px; margin-right: 6px; flex-shrink: 0;
+  max-height: 65vh; overflow-y: auto; scrollbar-width: thin;
+  scrollbar-color: rgba(139,92,246,0.35) transparent;
+}
+.row-nums::-webkit-scrollbar { width: 4px; }
+.row-nums::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.35); border-radius: 2px; }
+.row-num {
+  height: 58px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  width: 20px;
+}
+
+.seat-grid {
+  display: flex; flex-direction: column; gap: 4px; flex: 1;
+  max-height: 65vh; overflow-y: auto; scrollbar-width: thin;
+  scrollbar-color: rgba(139,92,246,0.35) transparent;
+}
+.seat-grid::-webkit-scrollbar { width: 4px; }
+.seat-grid::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.35); border-radius: 2px; }
+.seat-row {
+  display: grid;
+  gap: 4px; align-items: center;
+}
+
+.aisle {
+  display: flex; align-items: center; justify-content: center;
+  height: 58px;
+}
+.aisle-dot { width: 3px; height: 30px; background: var(--border); border-radius: 3px; }
+
+/* SEAT CARD */
+.seat {
+  height: 58px; border-radius: 10px; border: 1.5px solid var(--border);
+  background: var(--card); cursor: pointer; transition: all 0.15s;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 4px 6px; position: relative; overflow: hidden; user-select: none;
+}
+.seat.empty {
+  background: transparent; border-color: transparent;
+  border: 1.5px dashed rgba(255,255,255,0.06); cursor: default;
+}
+.seat:not(.empty):hover {
+  transform: translateY(-2px); border-color: rgba(139,92,246,0.5);
+  box-shadow: 0 4px 20px rgba(99,102,241,0.2);
+}
+.seat.selected {
+  border-color: #818cf8 !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.18)) !important;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.3);
+}
+
+/* Score coloring */
+.seat.pts-high { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.25); }
+.seat.pts-mid { background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.2); }
+.seat.pts-low { background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.2); }
+
+.seat-name { font-size: 16px; font-weight: 700; text-align: center; line-height: 1.2; }
+.seat-pts {
+  font-size: 12px; font-weight: 900; margin-top: 2px;
+  padding: 1px 6px; border-radius: 5px;
+}
+.seat-pos { color: var(--green); background: rgba(74,222,128,0.15); }
+.seat-neg { color: var(--red); background: rgba(248,113,113,0.15); }
+.seat-zero { color: var(--muted); }
+.seat-tag {
+  position: absolute; top: 3px; left: 4px;
+  font-size: 9px; font-weight: 700; color: var(--muted); opacity: 0.6;
+}
+
+/* DOOR/WINDOW labels */
+.room-sides {
+  display: flex; justify-content: space-between; margin-top: 12px;
+}
+.side-label {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  background: var(--card); border-radius: 6px; padding: 4px 10px;
+  border: 1px solid var(--border);
+}
+
+/* COLUMN LABELS */
+.col-labels {
+  display: grid;
+  gap: 6px; margin-bottom: 8px;
+}
+.col-lbl {
+  text-align: center; font-size: 11px; font-weight: 800; color: var(--muted);
+  letter-spacing: 1px;
+}
+
+/* RIGHT PANEL */
+.right-panel {
+  width: 300px; min-width: 260px; border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; background: var(--surface);
+  flex-shrink: 0; min-height: 0; overflow: hidden;
+}
+
+.panel-empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--muted); gap: 12px; padding: 30px; text-align: center;
+}
+.panel-empty .big-icon { font-size: 50px; }
+
+/* STUDENT DETAIL */
+.stu-header {
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(168,85,247,0.07));
+}
+.stu-top { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.stu-avatar {
+  width: 52px; height: 52px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 900; flex-shrink: 0;
+}
+.stu-meta h2 { font-size: 20px; font-weight: 900; }
+.stu-meta p { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.stu-score-row { display: flex; align-items: baseline; gap: 6px; }
+.big-score { font-size: 44px; font-weight: 900; line-height: 1; }
+.score-unit { font-size: 14px; color: var(--muted); font-weight: 700; }
+
+/* QUICK ACTIONS */
+.quick-actions { padding: 14px; border-bottom: 1px solid var(--border); }
+.qa-label { font-size: 10px; font-weight: 800; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+.qa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.qa-btn {
+  padding: 10px 8px; border-radius: 10px; border: 1.5px solid transparent;
+  font-size: 12px; font-weight: 800; cursor: pointer; transition: all 0.15s;
+  font-family: inherit; display: flex; align-items: center; gap: 6px; justify-content: center;
+}
+.qa-answer { background: rgba(74,222,128,0.1); color: var(--green); border-color: rgba(74,222,128,0.25); }
+.qa-answer:hover { background: rgba(74,222,128,0.22); transform: translateY(-1px); }
+.qa-homework { background: rgba(250,204,21,0.1); color: var(--yellow); border-color: rgba(250,204,21,0.25); }
+.qa-homework:hover { background: rgba(250,204,21,0.22); transform: translateY(-1px); }
+.qa-deduct { background: rgba(248,113,113,0.1); color: var(--red); border-color: rgba(248,113,113,0.25); }
+.qa-deduct:hover { background: rgba(248,113,113,0.22); transform: translateY(-1px); }
+.qa-custom { background: rgba(192,132,252,0.1); color: var(--purple); border-color: rgba(192,132,252,0.25); }
+.qa-custom:hover { background: rgba(192,132,252,0.22); transform: translateY(-1px); }
+
+/* CUSTOM FORM */
+.custom-form {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  display: none; flex-direction: column; gap: 8px;
+}
+.custom-form.show { display: flex; }
+.cf-row { display: flex; gap: 8px; }
+.cf-input {
+  flex: 1; background: var(--card2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 9px; padding: 9px 12px;
+  font-size: 13px; font-family: inherit; outline: none;
+}
+.cf-input:focus { border-color: #818cf8; }
+.cf-pts { width: 80px; text-align: center; font-weight: 800; }
+.cf-apply {
+  padding: 9px 16px; border-radius: 9px; border: none;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff; font-weight: 800; cursor: pointer; font-size: 13px;
+  font-family: inherit; transition: opacity 0.15s;
+}
+.cf-apply:hover { opacity: 0.85; }
+
+/* LOG */
+.log-area { flex: 1; overflow-y: auto; padding: 14px; }
+.log-area::-webkit-scrollbar { width: 3px; }
+.log-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.log-hdr { font-size: 10px; font-weight: 800; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+.log-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; background: var(--card); border-radius: 9px;
+  border: 1px solid var(--border); margin-bottom: 6px;
+  animation: slideIn 0.25s ease;
+}
+@keyframes slideIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
+.log-tag {
+  font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 5px;
+  white-space: nowrap;
+}
+.log-note { flex: 1; font-size: 12px; color: var(--muted); }
+.log-d { font-size: 13px; font-weight: 900; }
+.log-undo {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  border-radius: 5px; padding: 2px 6px; cursor: pointer; font-size: 10px; font-family: inherit;
+}
+.log-undo:hover { border-color: var(--red); color: var(--red); }
+.log-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 20px 0; }
+
+/* STATS BAR */
+.stats-bar {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; flex-shrink: 0;
+  width: 100%; min-width: 400px;
+}
+.stat-mini {
+  background: var(--card); border-radius: 10px; padding: 10px 8px;
+  border: 1px solid var(--border); text-align: center;
+}
+.stat-mini .sv { font-size: 18px; font-weight: 900; }
+.stat-mini .sl { font-size: 11px; color: var(--muted); margin-top: 2px; font-weight: 600; }
+
+
+/* ====== HOMEWORK PANEL ====== */
+.hw-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+}
+.hw-overlay.show { display: flex; align-items: stretch; justify-content: flex-end; }
+.hw-panel {
+  width: 560px; max-width: 95vw;
+  background: var(--surface); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; animation: slideIn 0.28s ease;
+}
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.hw-panel-hdr {
+  padding: 18px 20px; border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.08));
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.hw-panel-hdr h2 { font-size: 16px; font-weight: 900; flex: 1; }
+.hw-close {
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px; font-family: inherit;
+}
+.hw-body { display: flex; flex: 1; overflow: hidden; }
+/* Left: homework list */
+.hw-list-col {
+  width: 200px; min-width: 200px; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.hw-list-top {
+  padding: 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hw-list-scroll { flex: 1; overflow-y: auto; padding: 8px; }
+.hw-item {
+  padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  border: 1.5px solid transparent; margin-bottom: 6px;
+  transition: all 0.15s; background: var(--card);
+}
+.hw-item:hover { border-color: rgba(139,92,246,0.4); }
+.hw-item.active {
+  border-color: #818cf8; background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.12));
+}
+.hw-item-title { font-size: 13px; font-weight: 800; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hw-item-meta { font-size: 10px; color: var(--muted); }
+.hw-item-del {
+  float: right; background: none; border: none; color: var(--muted);
+  cursor: pointer; font-size: 12px; padding: 0 2px; opacity: 0.5;
+  font-family: inherit;
+}
+.hw-item-del:hover { color: var(--red); opacity: 1; }
+/* Right: homework detail */
+.hw-detail-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.hw-detail-hdr {
+  padding: 14px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hw-detail-hdr h3 { font-size: 15px; font-weight: 900; margin-bottom: 2px; }
+.hw-detail-hdr p { font-size: 11px; color: var(--muted); }
+.hw-stats-row {
+  display: flex; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hw-stat { flex: 1; background: var(--card); border-radius: 9px; padding: 8px 10px; text-align: center; }
+.hw-stat .n { font-size: 20px; font-weight: 900; }
+.hw-stat .l { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.hw-seat-grid-wrap { flex: 1; overflow-y: auto; padding: 14px 16px; }
+.hw-seat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.hw-seat-btn {
+  padding: 8px 4px; border-radius: 8px; font-size: 11px; font-weight: 700;
+  text-align: center; cursor: pointer; border: 1.5px solid var(--border);
+  background: var(--card); color: var(--muted); transition: all 0.12s;
+  line-height: 1.3; font-family: inherit;
+}
+.hw-seat-btn:hover { border-color: rgba(139,92,246,0.5); color: var(--text); }
+.hw-seat-btn.submitted {
+  background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.5);
+  color: var(--green);
+}
+.hw-seat-btn.empty-slot { opacity: 0.2; cursor: default; pointer-events: none; }
+.hw-empty {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 10px; color: var(--muted); padding: 40px;
+  text-align: center;
+}
+/* New homework form */
+.hw-new-form {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px; display: flex; flex-direction: column; gap: 8px;
+}
+.hw-input {
+  background: var(--card2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; font-family: inherit;
+  outline: none; width: 100%;
+}
+.hw-input:focus { border-color: #818cf8; }
+.hw-btn-row { display: flex; gap: 6px; }
+.hw-add-btn {
+  flex: 1; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: 800;
+  cursor: pointer; font-family: inherit; border: none;
+  background: linear-gradient(135deg, #6366f1, #a855f7); color: #fff;
+}
+.hw-cancel-btn {
+  padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+}
+.hw-col-labels {
+  display: grid; grid-template-columns: repeat(6,1fr);
+  gap: 6px; margin-bottom: 4px;
+}
+.hw-col-lbl {
+  text-align: center; font-size: 10px; font-weight: 800; color: var(--muted);
+}
+
+
+/* ====== ROLL CALL ====== */
+.roll-overlay {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  background: rgba(5,4,15,0.92); backdrop-filter: blur(16px);
+  align-items: center; justify-content: center; flex-direction: column;
+}
+.roll-overlay.show { display: flex; }
+.roll-box {
+  position: relative; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+}
+.roll-label {
+  font-size: 13px; font-weight: 800; letter-spacing: 3px;
+  color: var(--muted); text-transform: uppercase;
+}
+.roll-seat-badge {
+  font-size: 14px; font-weight: 800; color: #a78bfa;
+  background: rgba(99,102,241,0.15); border: 1px solid rgba(139,92,246,0.4);
+  border-radius: 20px; padding: 4px 14px; margin-top: -8px;
+  min-height: 26px;
+}
+.roll-avatar {
+  width: 120px; height: 120px; border-radius: 28px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 52px; font-weight: 900;
+  box-shadow: 0 0 60px currentColor;
+  transition: background 0.05s, color 0.05s;
+  position: relative; overflow: hidden;
+}
+.roll-avatar::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+}
+.roll-name {
+  font-size: 52px; font-weight: 900; letter-spacing: 4px;
+  min-width: 300px; text-align: center;
+  transition: color 0.05s;
+  text-shadow: 0 0 40px currentColor;
+}
+.roll-pts-badge {
+  font-size: 14px; font-weight: 800;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 4px 16px; color: var(--muted);
+  min-height: 26px;
+}
+/* Particles */
+.roll-particles {
+  position: fixed; inset: 0; pointer-events: none; z-index: 301;
+}
+.particle {
+  position: absolute; border-radius: 50%;
+  animation: particleFly 1.2s ease-out forwards;
+  opacity: 0;
+}
+@keyframes particleFly {
+  0%   { transform: translate(0,0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+}
+/* Spinning ring */
+.roll-ring {
+  position: absolute; width: 160px; height: 160px; border-radius: 50%;
+  background: conic-gradient(from 0deg, #6366f1, #a855f7, #e879f9, #818cf8, #6366f1);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #fff calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #fff calc(100% - 4px));
+  opacity: 0.5; transition: opacity 0.4s;
+}
+.roll-ring.spinning { animation: spin 0.45s linear infinite; opacity: 1; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.roll-actions { display: flex; gap: 12px; margin-top: 8px; }
+.roll-btn {
+  padding: 13px 28px; border-radius: 12px; font-size: 15px; font-weight: 800;
+  cursor: pointer; font-family: inherit; border: none; transition: all 0.15s;
+}
+.roll-btn-again {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff; box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+}
+.roll-btn-again:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(99,102,241,0.5); }
+.roll-btn-close {
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+}
+.roll-btn-close:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+.roll-close-x {
+  position: absolute; top: 24px; right: 28px;
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 10px; padding: 8px 14px; cursor: pointer; font-size: 13px; font-family: inherit;
+  z-index: 302;
+}
+.roll-history {
+  display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+  max-width: 500px; margin-top: 4px;
+}
+.roll-hist-tag {
+  font-size: 11px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 10px; color: var(--muted);
+}
+.roll-history-label {
+  font-size: 11px; color: var(--muted); font-weight: 700;
+  letter-spacing: 1px; text-align: center; margin-top: 4px;
+}
+
+/* TOAST */
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--card2); border: 1px solid var(--border);
+  padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  z-index: 9999; animation: toastIn 0.3s ease; white-space: nowrap;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+/* ====== FULLSCREEN ====== */
+.fullscreen-exit-btn {
+  display: none;
+  position: fixed; top: 16px; right: 16px; z-index: 99999;
+  align-items: center; gap: 6px;
+  padding: 10px 18px; border-radius: 10px;
+  background: rgba(18,17,30,0.92); border: 1px solid rgba(139,92,246,0.5);
+  color: #c4b5fd; font-size: 13px; font-weight: 800;
+  cursor: pointer; font-family: inherit; backdrop-filter: blur(12px);
+  transition: all 0.15s;
+}
+.fullscreen-exit-btn:hover { background: rgba(99,102,241,0.25); }
+#seatPanel:fullscreen .fullscreen-exit-btn,
+#seatPanel:-webkit-full-screen .fullscreen-exit-btn,
+#seatPanel:-moz-full-screen .fullscreen-exit-btn { display: flex; }
+#seatPanel:fullscreen,
+#seatPanel:-webkit-full-screen,
+#seatPanel:-moz-full-screen {
+  background: var(--bg); padding: 24px 32px 32px;
+  max-height: none; overflow-y: auto;
+}
+#seatPanel:fullscreen .classroom-wrap,
+#seatPanel:-webkit-full-screen .classroom-wrap,
+#seatPanel:-moz-full-screen .classroom-wrap { min-width: unset; }
+#seatPanel:fullscreen .seat-grid,
+#seatPanel:-webkit-full-screen .seat-grid,
+#seatPanel:-moz-full-screen .seat-grid { max-height: none; }
+#seatPanel:fullscreen .row-nums,
+#seatPanel:-webkit-full-screen .row-nums,
+#seatPanel:-moz-full-screen .row-nums { max-height: none; }
+
+/* MODAL */
+.modal-bg {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+  z-index: 500; align-items: center; justify-content: center;
+}
+.modal-bg.show { display: flex; }
+.modal {
+  background: var(--surface); border-radius: 18px; padding: 28px;
+  width: 90%; max-width: 380px; border: 1px solid var(--border);
+  animation: modalIn 0.25s ease;
+}
+@keyframes modalIn { from { opacity:0; transform:scale(0.92); } to { opacity:1; transform:scale(1); } }
+.modal h3 { font-size: 18px; font-weight: 900; margin-bottom: 6px; }
+.modal p { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+.modal-btns { display: flex; gap: 10px; }
+.mbtn { flex:1; padding: 11px; border-radius: 10px; border: none; font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit; }
+.mbtn-cancel { background: var(--card); color: var(--muted); }
+.mbtn-ok { background: linear-gradient(135deg, #6366f1, #a855f7); color: #fff; }
+
+/* SCORE FILTER */
+.score-filter {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.sf-btn {
+  padding: 5px 12px; border-radius: 7px; font-size: 11px; font-weight: 700;
+  cursor: pointer; border: 1px solid var(--border); background: var(--card);
+  color: var(--muted); transition: all 0.12s; font-family: inherit;
+}
+.sf-btn.active { background: rgba(99,102,241,0.2); color: #c4b5fd; border-color: rgba(99,102,241,0.4); }
+
+/* LEGEND */
+.legend {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+}
+.leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); font-weight: 600; }
+.leg-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+/* ====== PROGRESS PANEL ====== */
+.prog-overlay {
+  display: none; position: fixed; inset: 0; z-index: 250;
+  background: rgba(0,0,0,0.65); backdrop-filter: blur(8px);
+  align-items: stretch; justify-content: flex-end;
+}
+.prog-overlay.show { display: flex; }
+.prog-panel {
+  width: 680px; max-width: 96vw; background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  animation: slideFromRight 0.28s ease;
+}
+@keyframes slideFromRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.prog-hdr {
+  padding: 18px 20px; border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.08));
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.prog-hdr h2 { font-size: 16px; font-weight: 900; flex: 1; }
+.prog-close {
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px; font-family: inherit;
+}
+.prog-settings {
+  padding: 12px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; flex-shrink: 0;
+  background: var(--card);
+}
+.prog-settings label { font-size: 12px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.prog-settings input {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 6px 10px; font-size: 13px; font-family: inherit;
+  outline: none; width: 70px; text-align: center;
+}
+.prog-settings input:focus { border-color: #818cf8; }
+.prog-scroll { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.prog-scroll::-webkit-scrollbar { width: 4px; }
+.prog-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.prog-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+  transition: border-color 0.15s;
+}
+.prog-card:hover { border-color: rgba(139,92,246,0.35); }
+.prog-card-top { display: flex; align-items: center; gap: 12px; }
+.prog-class-name { font-size: 13px; font-weight: 900; flex-shrink: 0; min-width: 100px; }
+.prog-lesson-row { display: flex; align-items: center; gap: 8px; flex: 1; }
+.prog-lesson-btns { display: flex; gap: 4px; margin-left: 6px; }
+.prog-lesson-btn {
+  width: 28px; height: 28px; border-radius: 7px; border: 1.5px solid var(--border);
+  background: var(--card2); color: var(--text); font-size: 16px; font-weight: 900;
+  cursor: pointer; transition: all 0.12s; display: flex; align-items: center; justify-content: center;
+  font-family: inherit; line-height: 1;
+}
+.prog-lesson-btn:hover { border-color: rgba(139,92,246,0.5); background: rgba(99,102,241,0.15); color: #a78bfa; transform: translateY(-1px); }
+.prog-lesson-btn:active { transform: translateY(0) scale(0.95); }
+.prog-lesson-label { font-size: 11px; color: var(--muted); font-weight: 700; white-space: nowrap; }
+.prog-lesson-input {
+  width: 52px; background: var(--card2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 5px 8px;
+  font-size: 14px; font-weight: 900; font-family: inherit; text-align: center; outline: none;
+}
+.prog-lesson-input:focus { border-color: #818cf8; }
+.prog-topic-input {
+  flex: 1; background: var(--card2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 5px 10px;
+  font-size: 12px; font-family: inherit; outline: none; min-width: 0;
+}
+.prog-topic-input:focus { border-color: #818cf8; }
+.prog-topic-input::placeholder { color: var(--muted); opacity: 0.7; }
+.prog-bar-wrap { display: flex; align-items: center; gap: 10px; }
+.prog-bar-bg {
+  flex: 1; height: 8px; background: rgba(255,255,255,0.06);
+  border-radius: 999px; overflow: hidden;
+}
+.prog-bar-fill {
+  height: 100%; border-radius: 999px; transition: width 0.35s ease;
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+}
+.prog-pct { font-size: 11px; font-weight: 900; color: var(--muted); min-width: 34px; text-align: right; }
+.prog-badge {
+  font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 5px;
+  background: rgba(99,102,241,0.15); color: #a78bfa; border: 1px solid rgba(99,102,241,0.25);
+  white-space: nowrap; flex-shrink: 0;
+}
+/* Compare view */
+.prog-compare {
+  padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0;
+  background: var(--card);
+}
+.prog-compare h3 { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+.prog-compare-grid { display: flex; flex-direction: column; gap: 5px; max-height: 160px; overflow-y: auto; }
+.prog-compare-row { display: flex; align-items: center; gap: 8px; }
+.prog-cmp-lbl { font-size: 11px; color: var(--muted); min-width: 80px; text-align: right; flex-shrink: 0; }
+.prog-cmp-bar-bg { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 99px; overflow: hidden; }
+.prog-cmp-fill { height: 100%; border-radius: 99px; transition: width 0.35s ease; }
+.prog-cmp-num { font-size: 11px; font-weight: 800; min-width: 26px; text-align: right; flex-shrink: 0; }
+
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <AAAAAAAAAAAAAAAAAAAAAdiv class="logo">
+    <div style="display:flex;flex-direction:column;line-height:1.2;"><span style="font-size:11px;color:var(--muted);font-weight:700;">机房</span><span style="font-size:15px;font-weight:900;">班级<span style="color:#a78bfa;">积分</span>管理系统</span></div>
+  </AAAAAAAAAAAAAAAAAAAAAdiv>
+  <div class="class-tabs" id="classTabs"></div>
+  <div class="hdr-actions">
+    <button class="hdr-btn" onclick="openProgPanel()">📈 课程进度</button>
+    <button class="hdr-btn" onclick="openRollCall()">🎲 随机点名</button>
+    <button class="hdr-btn" onclick="openHwPanel()">📋 作业管理</button>
+    <button class="hdr-btn" onclick="exportExcel()">📊 导出表格</button>
+    <button class="hdr-btn" onclick="toggleFullscreen()" id="fullscreenBtn">⛶ 全屏座位</button>
+    <button class="hdr-btn green" onclick="resetClassPoints()">🔄 清空本班积分</button>
+    <button class="hdr-btn" onclick="toggleTheme()" id="themeToggleBtn">🌙 深色模式</button>
+  </div>
+</header>
+
+<main>
+  <!-- SEAT PANEL -->
+  <div class="seat-panel" id="seatPanel">
+    <button class="fullscreen-exit-btn" onclick="exitFullscreen()">✕ 退出全屏</button>
+    <!-- Stats -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-mini"><div class="sv" id="st-total" style="color:#a78bfa">0</div><div class="sl">本班人数</div></div>
+      <div class="stat-mini"><div class="sv" id="st-avg" style="color:#60a5fa">0</div><div class="sl">平均积分</div></div>
+      <div class="stat-mini"><div class="sv" id="st-top" style="color:#4ade80; font-size:14px">—</div><div class="sl">最高分同学</div></div>
+    </div>
+
+    <!-- Filter row -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+      <div class="score-filter" id="scoreFilter">
+        <button class="sf-btn active" onclick="setFilter('all',this)">全部</button>
+        <button class="sf-btn" onclick="setFilter('high',this)">✨ 高分</button>
+        <button class="sf-btn" onclick="setFilter('low',this)">⚠️ 低分</button>
+        <button class="sf-btn" onclick="setFilter('zero',this)">➖ 零分</button>
+      </div>
+      <div class="legend">
+        <div class="leg"><div class="leg-dot" style="background:rgba(74,222,128,0.4)"></div>高分(≥5)</div>
+        <div class="leg"><div class="leg-dot" style="background:rgba(99,102,241,0.3)"></div>正分</div>
+        <div class="leg"><div class="leg-dot" style="background:rgba(248,113,113,0.3)"></div>负分</div>
+      </div>
+    </div>
+
+    <!-- Classroom -->
+    <div class="classroom-wrap">
+      <div class="room-label">📐 机房座位布局</div>
+
+      <div class="room-sides" style="margin-bottom:12px;">
+        <div class="side-label">🚪 门</div>
+        <div class="side-label">🪟 窗</div>
+      </div>
+
+      <!-- Column labels (filled dynamically) -->
+      <div class="col-labels" id="colLabels"></div>
+
+      <div class="seat-grid-wrapper">
+        <div class="row-nums" id="rowNums"></div>
+        <div class="seat-grid" id="seatGrid"></div>
+      </div>
+
+      <div class="podium" style="margin-top:20px;margin-bottom:0;">🖥️ 讲台</div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-empty" id="panelEmpty">
+      <div class="big-icon">👆</div>
+      <p style="font-size:15px;font-weight:800;">点击座位</p>
+      <p style="font-size:13px;">选择学生后可进行积分操作</p>
+    </div>
+
+    <div id="panelDetail" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <!-- Student header -->
+      <div class="stu-header">
+        <div class="stu-top">
+          <div class="stu-avatar" id="stuAvatar"></div>
+          <div class="stu-meta">
+            <div id="nameRow" style="display:flex;align-items:center;gap:8px;">
+              <h2 id="stuName"></h2>
+              <button id="editNameBtn" onclick="startEditName()" title="编辑姓名"
+                style="background:rgba(255,255,255,0.08);border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:3px 8px;cursor:pointer;font-size:12px;font-family:inherit;">✏️</button>
+            </div>
+            <div id="nameEditRow" style="display:none;align-items:center;gap:6px;">
+              <input id="nameEditInput" type="text" style="background:var(--card2);border:1px solid #818cf8;color:var(--text);border-radius:8px;padding:5px 10px;font-size:16px;font-weight:900;font-family:inherit;outline:none;width:130px;">
+              <button onclick="confirmEditName()" style="background:rgba(74,222,128,0.2);border:1px solid rgba(74,222,128,0.4);color:var(--green);border-radius:7px;padding:4px 8px;cursor:pointer;font-size:13px;">✅</button>
+              <button onclick="cancelEditName()" style="background:rgba(248,113,113,0.15);border:1px solid rgba(248,113,113,0.3);color:var(--red);border-radius:7px;padding:4px 8px;cursor:pointer;font-size:13px;">✖</button>
+            </div>
+            <p id="stuSeat"></p>
+          </div>
+        </div>
+        <div class="stu-score-row">
+          <div class="big-score" id="stuScore">0</div>
+          <div class="score-unit">分</div>
+        </div>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="quick-actions">
+        <div class="qa-label">快速积分</div>
+        <div class="qa-grid">
+          <button class="qa-btn qa-answer" onclick="quickPts(2,'回答问题')">✋ +2 回答问题</button>
+          <button class="qa-btn qa-homework" onclick="quickPts(1,'其他奖励')">⭐ +1 其他奖励</button>
+          <button class="qa-btn qa-deduct" onclick="quickPts(-2,'违纪扣分')">⚠️ -2 违纪扣分</button>
+          <button class="qa-btn qa-custom" onclick="toggleCustom()">✏️ 自定义</button>
+        </div>
+      </div>
+
+      <!-- Custom form -->
+      <div class="custom-form" id="customForm">
+        <div class="cf-row">
+          <input type="number" class="cf-input cf-pts" id="cfPts" value="1" placeholder="分值">
+          <input type="text" class="cf-input" id="cfNote" placeholder="备注（课堂表现等）">
+        </div>
+        <button class="cf-apply" onclick="applyCustom()">✅ 确认应用</button>
+      </div>
+
+      <!-- Log -->
+      <div class="log-area">
+        <div class="log-hdr">积分记录</div>
+        <div id="logList"></div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+
+
+<!-- PROGRESS PANEL OVERLAY -->
+<div class="prog-overlay" id="progOverlay" onclick="closeProgPanelOutside(event)">
+  <div class="prog-panel" id="progPanel">
+    <div class="prog-hdr">
+      <span style="font-size:20px;">📈</span>
+      <h2>课程进度管理</h2>
+      <button class="prog-close" onclick="closeProgPanel()">✕ 关闭</button>
+    </div>
+    <div class="prog-settings">
+      <label>📚 总课时：</label>
+      <input type="number" id="progTotalInput" value="20" min="1" max="200" onchange="onProgTotalChange()">
+      <span style="font-size:12px;color:var(--muted);">设置全班课程总课时数，用于计算进度百分比</span>
+    </div>
+    <div class="prog-scroll" id="progCardList"></div>
+    <div class="prog-compare">
+      <h3>📊 进度对比一览</h3>
+      <div class="prog-compare-grid" id="progCompareGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- HOMEWORK PANEL OVERLAY -->
+<div class="hw-overlay" id="hwOverlay" onclick="closeHwPanelOutside(event)">
+  <div class="hw-panel" id="hwPanel">
+    <div class="hw-panel-hdr">
+      <span style="font-size:20px;">📋</span>
+      <h2 id="hwPanelTitle">作业提交记录</h2>
+      <button class="hw-close" onclick="closeHwPanel()">✕ 关闭</button>
+    </div>
+    <div class="hw-body">
+      <!-- Left: list -->
+      <div class="hw-list-col">
+        <div class="hw-list-top">
+          <button onclick="showNewHwForm()" style="width:100%;padding:8px;border-radius:8px;border:1.5px dashed rgba(139,92,246,0.5);background:rgba(99,102,241,0.08);color:#a78bfa;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;">
+            ＋ 新建作业
+          </button>
+          <div id="newHwForm" style="display:none;margin-top:8px;">
+            <div class="hw-new-form">
+              <input class="hw-input" id="hwTitleInput" placeholder="作业名称（如：第3课练习）" maxlength="30">
+              <input class="hw-input" id="hwDateInput" type="date">
+              <div class="hw-btn-row">
+                <button class="hw-add-btn" onclick="addHomework()">✅ 创建</button>
+                <button class="hw-cancel-btn" onclick="hideNewHwForm()">取消</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="hw-list-scroll" id="hwListScroll"></div>
+      </div>
+      <!-- Right: detail -->
+      <div class="hw-detail-col" id="hwDetailCol">
+        <div class="hw-empty" id="hwDetailEmpty">
+          <div style="font-size:40px;">📝</div>
+          <p style="font-size:14px;font-weight:800;">选择一项作业</p>
+          <p style="font-size:12px;">或新建作业开始记录</p>
+        </div>
+        <div id="hwDetailContent" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+          <div class="hw-detail-hdr">
+            <h3 id="hwDetailTitle"></h3>
+            <p id="hwDetailDate"></p>
+          </div>
+          <div class="hw-stats-row">
+            <div class="hw-stat"><div class="n" id="hwStatTotal" style="color:#a78bfa">0</div><div class="l">班级总人数</div></div>
+            <div class="hw-stat"><div class="n" id="hwStatSubmit" style="color:#4ade80">0</div><div class="l">已提交</div></div>
+            <div class="hw-stat"><div class="n" id="hwStatMiss" style="color:#f87171">0</div><div class="l">未提交</div></div>
+            <div class="hw-stat"><div class="n" id="hwStatRate" style="color:#facc15">0%</div><div class="l">提交率</div></div>
+          </div>
+          <div class="hw-seat-grid-wrap">
+            <div class="hw-col-labels" id="hwColLabels">
+              <div class="hw-col-lbl">A列</div><div class="hw-col-lbl">B列</div>
+              <div class="hw-col-lbl">C列</div><div class="hw-col-lbl">D列</div>
+              <div class="hw-col-lbl">E列</div><div class="hw-col-lbl">F列</div>
+            </div>
+            <div class="hw-seat-grid" id="hwSeatGrid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ROLL CALL OVERLAY -->
+<div class="roll-overlay" id="rollOverlay">
+  <button class="roll-close-x" onclick="closeRollCall()">✕ 关闭</button>
+  <div class="roll-particles" id="rollParticles"></div>
+  <div class="roll-box">
+    <div class="roll-label" id="rollClassLabel"></div>
+    <div class="roll-seat-badge" id="rollSeatBadge">&nbsp;</div>
+    <div style="position:relative;display:flex;align-items:center;justify-content:center;">
+      <div class="roll-ring" id="rollRing"></div>
+      <div class="roll-avatar" id="rollAvatar">?</div>
+    </div>
+    <div class="roll-name" id="rollName">？？？</div>
+    <div class="roll-pts-badge" id="rollPtsBadge">&nbsp;</div>
+    <div class="roll-actions">
+      <button class="roll-btn roll-btn-again" onclick="doRoll()">🎲 再抽一次</button>
+      <button class="roll-btn roll-btn-close" onclick="closeRollCall()">关闭</button>
+    </div>
+    <div class="roll-history-label" id="rollHistLabel" style="display:none;">本次已点名</div>
+    <div class="roll-history" id="rollHistory"></div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="mTitle"></h3>
+    <p id="mMsg"></p>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-cancel" onclick="closeModal()">取消</button>
+      <button class="mbtn mbtn-ok" id="mOk">确认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======================== DATA ========================
+const SEAT_DATA = {};
+
+const COLS = typeof ROOM_COLS !== 'undefined' ? ROOM_COLS : ['A','B','C','D','E','F'];
+const COLORS = ['#f472b6','#fb923c','#facc15','#4ade80','#34d399','#22d3ee','#60a5fa','#a78bfa','#e879f9','#f87171'];
+
+function getColor(name) {
+  let h = 0; for (const c of name) h += c.charCodeAt(0);
+  return COLORS[h % COLORS.length];
+}
+
+// State
+let currentClass = Object.keys(SEAT_DATA)[0];
+let selectedSeat = null;
+let points = {}; // { className: { seatKey: { pts, log } } }
+let activeFilter = 'all';
+
+function initPoints() {
+  const saved = localStorage.getItem('machineRoomPoints_v2');
+  if (saved) {
+    try { points = JSON.parse(saved); } catch(e) { points = {}; }
+  }
+}
+
+function savePoints() {
+  localStorage.setItem('machineRoomPoints_v2', JSON.stringify(points));
+}
+
+function getClassPoints(cls) {
+  if (!points[cls]) points[cls] = {};
+  return points[cls];
+}
+
+function getSeatData(cls, seat) {
+  const cp = getClassPoints(cls);
+  if (!cp[seat]) cp[seat] = { pts: 0, log: [] };
+  return cp[seat];
+}
+
+// ======================== INIT ========================
+function init() {
+  initPoints();
+  initHw();
+  initProg();
+  buildClassTabs();
+  renderAll();
+}
+
+function buildClassTabs() {
+  const classes = Object.keys(SEAT_DATA);
+  document.getElementById('classTabs').innerHTML = classes.map(c =>
+    `<div class="class-tab ${c===currentClass?'active':''}" onclick="switchClass('${c}',this)">${c.replace('初2028届','').replace('班','班')}</div>`
+  ).join('');
+}
+
+function switchClass(cls, el) {
+  currentClass = cls;
+  selectedSeat = null;
+  document.querySelectorAll('.class-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderAll();
+}
+
+// ======================== RENDER ========================
+function renderAll() {
+  renderStats();
+  renderColLabels();
+  renderSeats();
+  renderDetail();
+}
+
+// Build layout array with aisle markers every 2 columns
+function buildLayout() {
+  const layout = [];
+  for (let i = 0; i < COLS.length; i++) {
+    if (i > 0 && i % 2 === 0) layout.push('|');
+    layout.push(COLS[i]);
+  }
+  return layout;
+}
+
+function getGridTemplate(layout) {
+  return layout.map(x => x === '|' ? '12px' : '1fr').join(' ');
+}
+
+function renderColLabels() {
+  const layout = buildLayout();
+  const colLabels = document.getElementById('colLabels');
+  // grid: 28px (row-num spacer) + layout
+  colLabels.style.gridTemplateColumns = '28px ' + getGridTemplate(layout);
+  let html = '<div></div>'; // row-num spacer
+  for (const x of layout) {
+    if (x === '|') html += '<div></div>';
+    else html += `<div class="col-lbl">${x}</div>`;
+  }
+  colLabels.innerHTML = html;
+}
+
+function getMaxRow() {
+  const seats = SEAT_DATA[currentClass];
+  let max = 8;
+  for (const k of Object.keys(seats)) {
+    const r = parseInt(k.slice(1));
+    if (r > max) max = r;
+  }
+  return max;
+}
+
+function renderSeats() {
+  const seats = SEAT_DATA[currentClass];
+  const cp = getClassPoints(currentClass);
+  const maxRow = getMaxRow();
+  const layout = buildLayout();
+  const gridTemplate = getGridTemplate(layout);
+
+  // Row nums (from maxRow down to 1)
+  const rowNums = document.getElementById('rowNums');
+  rowNums.innerHTML = '';
+  for (let r = maxRow; r >= 1; r--) {
+    const d = document.createElement('div');
+    d.className = 'row-num';
+    d.textContent = r;
+    rowNums.appendChild(d);
+  }
+
+  const grid = document.getElementById('seatGrid');
+  grid.innerHTML = '';
+
+  for (let r = maxRow; r >= 1; r--) {
+    const row = document.createElement('div');
+    row.className = 'seat-row';
+    row.style.gridTemplateColumns = gridTemplate;
+
+    for (const col of layout) {
+      if (col === '|') {
+        const a = document.createElement('div');
+        a.className = 'aisle';
+        a.innerHTML = '<div class="aisle-dot"></div>';
+        row.appendChild(a);
+        continue;
+      }
+      const key = `${col}${r}`;
+      const name = seats[key];
+      const div = document.createElement('div');
+
+      if (!name) {
+        div.className = 'seat empty';
+        row.appendChild(div);
+        continue;
+      }
+
+      const sd = getSeatData(currentClass, key);
+      const pts = sd.pts;
+      let colorClass = '';
+      if (activeFilter !== 'all') {
+        if (activeFilter === 'high' && pts < 5) { div.className = 'seat'; div.style.opacity='0.25'; }
+        else if (activeFilter === 'low' && pts >= 0) { div.className = 'seat'; div.style.opacity='0.25'; }
+        else if (activeFilter === 'zero' && pts !== 0) { div.className = 'seat'; div.style.opacity='0.25'; }
+      }
+
+      if (pts >= 5) colorClass = 'pts-high';
+      else if (pts > 0) colorClass = 'pts-mid';
+      else if (pts < 0) colorClass = 'pts-low';
+
+      div.className = `seat ${colorClass} ${selectedSeat===key?'selected':''}`;
+      div.onclick = () => selectSeat(key);
+
+      const ptsClass = pts > 0 ? 'seat-pos' : pts < 0 ? 'seat-neg' : 'seat-zero';
+      const ptsStr = pts > 0 ? `+${pts}` : `${pts}`;
+
+      div.innerHTML = `
+        <div class="seat-tag">${key}</div>
+        <div class="seat-name">${name}</div>
+        <div class="seat-pts ${ptsClass}">${pts===0?'—':ptsStr}</div>
+      `;
+      row.appendChild(div);
+    }
+    grid.appendChild(row);
+  }
+}
+
+function renderStats() {
+  const seats = SEAT_DATA[currentClass];
+  const cp = getClassPoints(currentClass);
+  const names = Object.values(seats);
+  const total = names.length;
+  let sum = 0, topPts = -Infinity, topName = '—';
+  for (const [k, sd] of Object.entries(cp)) {
+    if (seats[k]) {
+      sum += sd.pts;
+      if (sd.pts > topPts) { topPts = sd.pts; topName = seats[k]; }
+    }
+  }
+  const avg = total ? Math.round(sum / total) : 0;
+  document.getElementById('st-total').textContent = total;
+  document.getElementById('st-avg').textContent = avg;
+  document.getElementById('st-top').textContent = topName === '—' ? '—' : `${topName}(${topPts>0?'+':''}${topPts})`;
+}
+
+function renderDetail() {
+  const empty = document.getElementById('panelEmpty');
+  const detail = document.getElementById('panelDetail');
+  if (!selectedSeat || !SEAT_DATA[currentClass][selectedSeat]) {
+    empty.style.display = 'flex';
+    detail.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  detail.style.display = 'flex';
+
+  const name = SEAT_DATA[currentClass][selectedSeat];
+  const sd = getSeatData(currentClass, selectedSeat);
+  const col = getColor(name);
+  const scoreColor = sd.pts >= 0 ? 'var(--green)' : 'var(--red)';
+
+  // Reset name edit state
+  document.getElementById('nameEditRow').style.display = 'none';
+  document.getElementById('nameRow').style.display = 'flex';
+
+  document.getElementById('stuAvatar').style.cssText = `background:${col}22;color:${col};border:2px solid ${col}44;`;
+  document.getElementById('stuAvatar').textContent = name[0];
+  document.getElementById('stuName').textContent = name;
+  document.getElementById('stuSeat').textContent = `座位 ${selectedSeat} · ${currentClass}`;
+  document.getElementById('stuScore').style.color = scoreColor;
+  document.getElementById('stuScore').textContent = (sd.pts > 0 ? '+' : '') + sd.pts;
+
+  // Log
+  const logList = document.getElementById('logList');
+  if (!sd.log.length) {
+    logList.innerHTML = '<div class="log-empty">暂无积分记录</div>';
+  } else {
+    const tagColors = {
+      '回答问题': ['var(--green)','rgba(74,222,128,0.12)'],
+      '其他奖励': ['var(--yellow)','rgba(250,204,21,0.12)'],
+      '完成作业': ['var(--yellow)','rgba(250,204,21,0.12)'],
+      '违纪扣分': ['var(--red)','rgba(248,113,113,0.12)'],
+      '自定义': ['var(--purple)','rgba(192,132,252,0.12)']
+    };
+    logList.innerHTML = [...sd.log].reverse().map((l, ri) => {
+      const [tc, tbg] = tagColors[l.type] || ['var(--muted)','var(--card)'];
+      const realIdx = sd.log.length - 1 - ri;
+      const dStr = l.delta > 0 ? `+${l.delta}` : `${l.delta}`;
+      const dc = l.delta >= 0 ? 'var(--green)' : 'var(--red)';
+      return `<div class="log-item">
+        <div class="log-tag" style="color:${tc};background:${tbg}">${l.type}</div>
+        <div class="log-note">${l.note||l.type}</div>
+        <div class="log-d" style="color:${dc}">${dStr}</div>
+        <div style="font-size:10px;color:var(--muted);white-space:nowrap;">${l.time}</div>
+        <button class="log-undo" onclick="undoLog(${realIdx})">撤</button>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ======================== ACTIONS ========================
+function selectSeat(key) {
+  selectedSeat = key;
+  document.getElementById('customForm').classList.remove('show');
+  renderSeats();
+  renderDetail();
+}
+
+function quickPts(delta, type) {
+  if (!selectedSeat) return;
+  applyPts(delta, type, type);
+}
+
+function applyPts(delta, type, note) {
+  const sd = getSeatData(currentClass, selectedSeat);
+  sd.pts += delta;
+  const now = new Date(); const timeStr = now.toLocaleDateString('zh-CN',{month:'2-digit',day:'2-digit'}) + ' ' + now.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); sd.log.push({ type, note, delta, time: timeStr });
+  savePoints();
+  renderAll();
+  const name = SEAT_DATA[currentClass][selectedSeat];
+  showToast(`${name} ${delta>0?'➕':'➖'} ${Math.abs(delta)} 分`);
+}
+
+function toggleCustom() {
+  const f = document.getElementById('customForm');
+  f.classList.toggle('show');
+  if (f.classList.contains('show')) document.getElementById('cfPts').focus();
+}
+
+function applyCustom() {
+  const pts = parseInt(document.getElementById('cfPts').value) || 0;
+  const note = document.getElementById('cfNote').value.trim() || '自定义积分';
+  if (pts === 0) { showToast('⚠️ 分值不能为0'); return; }
+  applyPts(pts, '自定义', note);
+  document.getElementById('cfPts').value = '1';
+  document.getElementById('cfNote').value = '';
+  document.getElementById('customForm').classList.remove('show');
+}
+
+function undoLog(idx) {
+  const sd = getSeatData(currentClass, selectedSeat);
+  if (!sd.log[idx]) return;
+  const entry = sd.log[idx];
+  sd.pts -= entry.delta;
+  sd.log.splice(idx, 1);
+  savePoints();
+  renderAll();
+  showToast(`已撤销 ${entry.note}`);
+}
+
+function resetClassPoints() {
+  showModal(`清空 ${currentClass} 积分`, '确定要清空本班所有学生积分记录吗？此操作不可恢复。', () => {
+    points[currentClass] = {};
+    selectedSeat = null;
+    savePoints(); renderAll();
+    showToast('✅ 已清空本班积分');
+  });
+}
+
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.sf-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderSeats();
+}
+
+// ======================== EXPORT ========================
+function exportExcel() {
+  const seats = SEAT_DATA[currentClass];
+  const cp = getClassPoints(currentClass);
+
+  // Sheet 1: 积分汇总
+  const rows = [['座位','姓名','总积分','回答问题','作业提交','其他奖励','违纪扣分','自定义']];
+  const sorted = Object.entries(seats).map(([key, name]) => {
+    const sd = cp[key] || { pts: 0, log: [] };
+    const sum = t => sd.log.filter(l => l.type===t).reduce((a,l)=>a+l.delta,0);
+    return [key, name, sd.pts, sum('回答问题'), sum('完成作业'), sum('其他奖励'), sum('违纪扣分'), sum('自定义')];
+  }).sort((a,b) => b[2]-a[2]);
+  rows.push(...sorted);
+
+  // Sheet 2: 积分明细
+  const logRows = [['座位','姓名','积分类型','备注','分值','时间']];
+  for (const [key, name] of Object.entries(seats)) {
+    const sd = cp[key] || { pts: 0, log: [] };
+    for (const l of sd.log) logRows.push([key, name, l.type, l.note||'', l.delta, l.time]);
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), '积分汇总');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(logRows), '积分明细');
+
+  // Sheet 3+: 作业提交记录（每份作业一个sheet）
+  const hwList = getClassHw(currentClass);
+  if (hwList.length > 0) {
+    // Combined homework overview sheet
+    const seatKeys = Object.keys(seats);
+    const hwHeader = ['座位', '姓名', ...hwList.map(hw => `${hw.date} ${hw.title}`)];
+    const hwRows = [hwHeader];
+    for (const key of seatKeys) {
+      const name = seats[key];
+      const row = [key, name, ...hwList.map(hw => hw.submitted.includes(key) ? '✓' : '✗')];
+      hwRows.push(row);
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hwRows), '作业提交汇总');
+
+    // Individual sheet per homework
+    for (const hw of hwList) {
+      const sheetName = (hw.title.slice(0, 10)).replace(/[\/\\\[\]\*\?:]/g, '_');
+      const sheetRows = [['座位', '姓名', '是否提交']];
+      for (const key of seatKeys) {
+        sheetRows.push([key, seats[key], hw.submitted.includes(key) ? '已提交' : '未提交']);
+      }
+      // Add summary row
+      sheetRows.push([]);
+      sheetRows.push(['提交人数', hw.submitted.length, '未提交人数', seatKeys.length - hw.submitted.length]);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetRows), sheetName);
+    }
+  }
+
+  const date = new Date().toLocaleDateString('zh-CN').replace(/\//g,'-');
+  XLSX.writeFile(wb, `${currentClass}_积分作业_${date}.xlsx`);
+  showToast(`📊 已导出 ${currentClass}（含${hwList.length}份作业记录）`);
+}
+
+// ======================== MODAL ========================
+let modalCb = null;
+function showModal(title, msg, cb) {
+  document.getElementById('mTitle').textContent = title;
+  document.getElementById('mMsg').textContent = msg;
+  modalCb = cb;
+  document.getElementById('mOk').onclick = () => { closeModal(); cb && cb(); };
+  document.getElementById('modalBg').classList.add('show');
+}
+function closeModal() { document.getElementById('modalBg').classList.remove('show'); }
+
+// ======================== TOAST ========================
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+// ======================== NAME EDIT ========================
+function startEditName() {
+  if (!selectedSeat) return;
+  const currentName = SEAT_DATA[currentClass][selectedSeat];
+  document.getElementById('nameRow').style.display = 'none';
+  const editRow = document.getElementById('nameEditRow');
+  editRow.style.display = 'flex';
+  const input = document.getElementById('nameEditInput');
+  input.value = currentName;
+  input.focus();
+  input.select();
+  input.onkeydown = e => {
+    if (e.key === 'Enter') confirmEditName();
+    if (e.key === 'Escape') cancelEditName();
+  };
+}
+
+function confirmEditName() {
+  if (!selectedSeat) return;
+  const newName = document.getElementById('nameEditInput').value.trim();
+  if (newName) {
+    SEAT_DATA[currentClass][selectedSeat] = newName;
+    showToast('✅ 已将姓名改为：' + newName);
+    renderAll();
+  } else {
+    cancelEditName();
+  }
+}
+
+function cancelEditName() {
+  document.getElementById('nameEditRow').style.display = 'none';
+  document.getElementById('nameRow').style.display = 'flex';
+}
+
+
+// Logo click disabled
+
+
+
+// ======================== HOMEWORK ========================
+// homework data: { className: [ { id, title, date, submitted: Set-as-array-of-seatKeys } ] }
+let hwData = {};
+let activeHwClass = null;
+let activeHwId = null;
+
+function initHw() {
+  // Try v2 key first (per-class format)
+  let saved = localStorage.getItem('machineRoomHW_v2');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      // Validate it's an object (not old flat array)
+      hwData = (!Array.isArray(parsed) && typeof parsed === 'object' && parsed !== null) ? parsed : {};
+    } catch(e) { hwData = {}; }
+    return;
+  }
+  // Try to migrate from v1 if it has per-class structure
+  const v1 = localStorage.getItem('machineRoomHW_v1');
+  if (v1) {
+    try {
+      const p = JSON.parse(v1);
+      if (!Array.isArray(p) && typeof p === 'object' && p !== null) {
+        hwData = p;
+        saveHw(); // Migrate to v2 key
+        return;
+      }
+    } catch(e) {}
+  }
+  hwData = {};
+}
+
+function saveHw() {
+  localStorage.setItem('machineRoomHW_v2', JSON.stringify(hwData));
+}
+
+function getClassHw(cls) {
+  if (!hwData[cls]) hwData[cls] = [];
+  return hwData[cls];
+}
+
+function openHwPanel() {
+  activeHwClass = currentClass;
+  // Reset selected homework when switching to a different class panel
+  activeHwId = null;
+  document.getElementById('hwDetailEmpty').style.display = 'flex';
+  document.getElementById('hwDetailContent').style.display = 'none';
+  document.getElementById('hwPanelTitle').textContent = `作业提交记录 · ${currentClass}`;
+  document.getElementById('hwOverlay').classList.add('show');
+  hideNewHwForm();
+  renderHwList();
+}
+
+function closeHwPanel() {
+  document.getElementById('hwOverlay').classList.remove('show');
+}
+
+function closeHwPanelOutside(e) {
+  if (e.target === document.getElementById('hwOverlay')) closeHwPanel();
+}
+
+function showNewHwForm() {
+  const form = document.getElementById('newHwForm');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  if (form.style.display !== 'none') {
+    // Set today as default date
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('hwDateInput').value = today;
+    document.getElementById('hwTitleInput').value = '';
+    document.getElementById('hwTitleInput').focus();
+  }
+}
+
+function hideNewHwForm() {
+  document.getElementById('newHwForm').style.display = 'none';
+}
+
+function addHomework() {
+  const title = document.getElementById('hwTitleInput').value.trim();
+  const date = document.getElementById('hwDateInput').value;
+  if (!title) { showToast('⚠️ 请输入作业名称'); return; }
+  const list = getClassHw(activeHwClass);
+  const id = 'hw_' + Date.now();
+  list.unshift({ id, title, date: date || new Date().toISOString().slice(0,10), submitted: [] });
+  saveHw();
+  hideNewHwForm();
+  renderHwList();
+  selectHw(id);
+  showToast('✅ 已创建作业：' + title);
+}
+
+function deleteHomework(id, e) {
+  e.stopPropagation();
+  const list = getClassHw(activeHwClass);
+  const hw = list.find(h => h.id === id);
+  if (!hw) return;
+  showModal('删除作业', `确定删除「${hw.title}」？此操作不可撤销。`, () => {
+    const idx = list.findIndex(h => h.id === id);
+    if (idx !== -1) list.splice(idx, 1);
+    saveHw();
+    if (activeHwId === id) {
+      activeHwId = null;
+      document.getElementById('hwDetailEmpty').style.display = 'flex';
+      document.getElementById('hwDetailContent').style.display = 'none';
+    }
+    renderHwList();
+  });
+}
+
+function renderHwList() {
+  const list = getClassHw(activeHwClass);
+  const el = document.getElementById('hwListScroll');
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px;">暂无作业<br>点击上方新建</div>';
+    return;
+  }
+  el.innerHTML = list.map(hw => {
+    const count = hw.submitted.length;
+    const total = Object.keys(SEAT_DATA[activeHwClass] || {}).length;
+    const isActive = hw.id === activeHwId;
+    return `<div class="hw-item${isActive ? ' active' : ''}" onclick="selectHw('${hw.id}')">
+      <button class="hw-item-del" onclick="deleteHomework('${hw.id}', event)">✕</button>
+      <div class="hw-item-title">${hw.title}</div>
+      <div class="hw-item-meta">${hw.date} &nbsp;·&nbsp; ${count}/${total}人</div>
+    </div>`;
+  }).join('');
+}
+
+function selectHw(id) {
+  activeHwId = id;
+  renderHwList();
+  renderHwDetail();
+}
+
+function renderHwDetail() {
+  const list = getClassHw(activeHwClass);
+  const hw = list.find(h => h.id === activeHwId);
+  if (!hw) return;
+
+  document.getElementById('hwDetailEmpty').style.display = 'none';
+  const dc = document.getElementById('hwDetailContent');
+  dc.style.display = 'flex';
+
+  document.getElementById('hwDetailTitle').textContent = hw.title;
+  document.getElementById('hwDetailDate').textContent = hw.date + ' · 点击学生卡片标记提交状态';
+
+  const seats = SEAT_DATA[activeHwClass];
+  const total = Object.keys(seats).length;
+  const submitCount = hw.submitted.length;
+  const missing = total - submitCount;
+  const rate = total > 0 ? Math.round(submitCount / total * 100) : 0;
+
+  document.getElementById('hwStatTotal').textContent = total;
+  document.getElementById('hwStatSubmit').textContent = submitCount;
+  document.getElementById('hwStatMiss').textContent = missing;
+  document.getElementById('hwStatRate').textContent = rate + '%';
+
+  // Build seat grid: rows 1-10 (or max), dynamic cols
+  const maxRow = Math.max(...Object.keys(seats).map(k => parseInt(k.slice(1)) || 0));
+  const grid = document.getElementById('hwSeatGrid');
+  grid.style.gridTemplateColumns = `repeat(${COLS.length}, 1fr)`;
+  const colLabelsEl = document.querySelector('.hw-col-labels');
+  if (colLabelsEl) colLabelsEl.style.gridTemplateColumns = `repeat(${COLS.length}, 1fr)`;
+  let html = '';
+  for (let r = maxRow; r >= 1; r--) {
+    for (const col of COLS) {
+      const key = col + r;
+      const name = seats[key];
+      if (!name) {
+        html += `<div class="hw-seat-btn empty-slot"></div>`;
+      } else {
+        const done = hw.submitted.includes(key);
+        html += `<div class="hw-seat-btn${done ? ' submitted' : ''}" onclick="toggleHwSubmit('${hw.id}','${key}')">
+          <div style="font-size:9px;opacity:0.6;">${key}</div>
+          <div>${name}</div>
+          ${done ? '<div style="font-size:10px;margin-top:2px;">✓</div>' : ''}
+        </div>`;
+      }
+    }
+  }
+  grid.innerHTML = html;
+}
+
+function toggleHwSubmit(hwId, seatKey) {
+  const list = getClassHw(activeHwClass);
+  const hw = list.find(h => h.id === hwId);
+  if (!hw) return;
+  const idx = hw.submitted.indexOf(seatKey);
+  if (idx === -1) {
+    // Mark as submitted: add +3 pts
+    hw.submitted.push(seatKey);
+    const sd = getSeatData(activeHwClass, seatKey);
+    sd.pts += 3;
+    const now = new Date();
+    const timeStr = now.toLocaleDateString('zh-CN',{month:'2-digit',day:'2-digit'}) + ' ' + now.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    sd.log.push({ type: '完成作业', note: hw.title, delta: 3, time: timeStr });
+    savePoints();
+    const name = SEAT_DATA[activeHwClass][seatKey];
+    showToast(`✅ ${name} 提交「${hw.title}」+3分`);
+  } else {
+    // Unmark: remove pts too (find and remove the matching log entry)
+    hw.submitted.splice(idx, 1);
+    const sd = getSeatData(activeHwClass, seatKey);
+    const logIdx = sd.log.findLastIndex(l => l.type === '完成作业' && l.note === hw.title && l.delta === 3);
+    if (logIdx !== -1) {
+      sd.pts -= 3;
+      sd.log.splice(logIdx, 1);
+      savePoints();
+    }
+    const name = SEAT_DATA[activeHwClass][seatKey];
+    showToast(`↩️ ${name} 已取消提交`);
+  }
+  saveHw();
+  // Refresh main seat view if viewing same class
+  if (activeHwClass === currentClass) renderSeats();
+  renderHwDetail();
+  renderHwList();
+}
+
+
+// ======================== ROLL CALL ========================
+let rollHistory = [];
+let rollTimer = null;
+let rollIsSpinning = false;
+
+function openRollCall() {
+  rollHistory = [];
+  document.getElementById('rollOverlay').classList.add('show');
+  document.getElementById('rollClassLabel').textContent = currentClass;
+  document.getElementById('rollHistory').innerHTML = '';
+  document.getElementById('rollHistLabel').style.display = 'none';
+  resetRollDisplay();
+  doRoll();
+}
+
+function closeRollCall() {
+  if (rollTimer) { clearInterval(rollTimer); rollTimer = null; }
+  rollIsSpinning = false;
+  document.getElementById('rollOverlay').classList.remove('show');
+  document.getElementById('rollRing').classList.remove('spinning');
+}
+
+function resetRollDisplay() {
+  document.getElementById('rollAvatar').textContent = '?';
+  document.getElementById('rollAvatar').style.cssText = 'width:120px;height:120px;border-radius:28px;display:flex;align-items:center;justify-content:center;font-size:52px;font-weight:900;box-shadow:0 0 40px rgba(99,102,241,0.5);background:rgba(99,102,241,0.15);color:#818cf8;';
+  document.getElementById('rollName').textContent = '？？？';
+  document.getElementById('rollName').style.color = '#818cf8';
+  document.getElementById('rollSeatBadge').innerHTML = '&nbsp;';
+  document.getElementById('rollPtsBadge').innerHTML = '&nbsp;';
+}
+
+function doRoll() {
+  if (rollIsSpinning) return;
+  const seats = SEAT_DATA[currentClass];
+  const allStudents = Object.entries(seats).filter(([k,v]) => v);
+  if (!allStudents.length) return;
+
+  // Prefer not-yet-called students
+  const notCalled = allStudents.filter(([k]) => !rollHistory.includes(k));
+  const pool = notCalled.length > 0 ? notCalled : allStudents;
+
+  rollIsSpinning = true;
+  document.getElementById('rollRing').classList.add('spinning');
+
+  const totalFrames = 28;
+  let frame = 0;
+
+  // Pick final target
+  const finalIdx = Math.floor(Math.random() * pool.length);
+  const [finalSeat, finalName] = pool[finalIdx];
+
+  rollTimer = setInterval(() => {
+    frame++;
+    // Show random flickering names during spin
+    const rand = allStudents[Math.floor(Math.random() * allStudents.length)];
+    const [rSeat, rName] = rand;
+    const col = getColor(rName);
+    document.getElementById('rollAvatar').textContent = rName[0];
+    document.getElementById('rollAvatar').style.cssText = `width:120px;height:120px;border-radius:28px;display:flex;align-items:center;justify-content:center;font-size:52px;font-weight:900;background:${col}22;color:${col};box-shadow:0 0 40px ${col}66;position:relative;overflow:hidden;`;
+    document.getElementById('rollName').textContent = rName;
+    document.getElementById('rollName').style.color = col;
+    document.getElementById('rollSeatBadge').textContent = rSeat;
+
+    // Slow down near end
+    if (frame >= totalFrames) {
+      clearInterval(rollTimer);
+      rollTimer = null;
+      rollIsSpinning = false;
+      document.getElementById('rollRing').classList.remove('spinning');
+      showRollResult(finalSeat, finalName);
+    }
+  }, frame < 18 ? 55 : 90);
+}
+
+function showRollResult(seatKey, name) {
+  const col = getColor(name);
+  const sd = getSeatData(currentClass, seatKey);
+
+  document.getElementById('rollAvatar').textContent = name[0];
+  document.getElementById('rollAvatar').style.cssText = `width:120px;height:120px;border-radius:28px;display:flex;align-items:center;justify-content:center;font-size:52px;font-weight:900;background:${col}28;color:${col};box-shadow:0 0 60px ${col}88;position:relative;overflow:hidden;`;
+  document.getElementById('rollName').textContent = name;
+  document.getElementById('rollName').style.color = col;
+  document.getElementById('rollSeatBadge').textContent = `座位 ${seatKey}`;
+  document.getElementById('rollPtsBadge').textContent = `当前积分：${sd.pts > 0 ? '+' : ''}${sd.pts} 分`;
+
+  // Add to history
+  if (!rollHistory.includes(seatKey)) rollHistory.push(seatKey);
+  renderRollHistory();
+
+  // Shoot particles
+  shootParticles(col);
+}
+
+function renderRollHistory() {
+  const seats = SEAT_DATA[currentClass];
+  const el = document.getElementById('rollHistory');
+  if (rollHistory.length === 0) {
+    document.getElementById('rollHistLabel').style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  document.getElementById('rollHistLabel').style.display = 'block';
+  el.innerHTML = rollHistory.map(k =>
+    `<div class="roll-hist-tag">${seats[k]} <span style="opacity:0.5">${k}</span></div>`
+  ).join('');
+}
+
+function shootParticles(color) {
+  const container = document.getElementById('rollParticles');
+  container.innerHTML = '';
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const colors = [color, '#818cf8', '#a855f7', '#f472b6', '#facc15', '#4ade80'];
+  for (let i = 0; i < 40; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = 6 + Math.random() * 10;
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 180 + Math.random() * 280;
+    const tx = Math.cos(angle) * dist + 'px';
+    const ty = Math.sin(angle) * dist + 'px';
+    p.style.cssText = `width:${size}px;height:${size}px;left:${cx}px;top:${cy}px;background:${colors[i%colors.length]};--tx:${tx};--ty:${ty};animation-delay:${Math.random()*0.15}s;animation-duration:${0.8+Math.random()*0.6}s;`;
+    container.appendChild(p);
+  }
+  setTimeout(() => { container.innerHTML = ''; }, 1500);
+}
+
+
+
+// ======================== PROGRESS MANAGEMENT ========================
+let progData = {}; // { className: { lesson: 0, topic: '', notes: '' } }
+let progTotal = 20;
+
+function initProg() {
+  const saved = localStorage.getItem('machineRoomProg_v1');
+  if (saved) {
+    try {
+      const p = JSON.parse(saved);
+      progData = p.data || {};
+      progTotal = p.total || 20;
+    } catch(e) {}
+  }
+}
+
+function saveProg() {
+  localStorage.setItem('machineRoomProg_v1', JSON.stringify({ data: progData, total: progTotal }));
+}
+
+function getClassProg(cls) {
+  if (!progData[cls]) progData[cls] = { lesson: 0, topic: '', notes: '' };
+  return progData[cls];
+}
+
+function openProgPanel() {
+  document.getElementById('progTotalInput').value = progTotal;
+  document.getElementById('progOverlay').classList.add('show');
+  renderProgCards();
+  renderProgCompare();
+}
+
+function closeProgPanel() {
+  document.getElementById('progOverlay').classList.remove('show');
+}
+
+function closeProgPanelOutside(e) {
+  if (e.target === document.getElementById('progOverlay')) closeProgPanel();
+}
+
+function onProgTotalChange() {
+  const v = parseInt(document.getElementById('progTotalInput').value) || 20;
+  progTotal = Math.max(1, Math.min(200, v));
+  saveProg();
+  renderProgCards();
+  renderProgCompare();
+}
+
+// Colour palette for class bars
+const PROG_COLORS = [
+  '#6366f1','#a855f7','#ec4899','#f97316','#eab308',
+  '#22c55e','#06b6d4','#3b82f6','#8b5cf6','#10b981',
+  '#f59e0b','#ef4444','#84cc16','#14b8a6','#f472b6','#60a5fa'
+];
+
+function renderProgCards() {
+  const classes = Object.keys(SEAT_DATA);
+  const el = document.getElementById('progCardList');
+  el.innerHTML = classes.map((cls, i) => {
+    const p = getClassProg(cls);
+    const pct = progTotal > 0 ? Math.min(100, Math.round(p.lesson / progTotal * 100)) : 0;
+    const col = PROG_COLORS[i % PROG_COLORS.length];
+    const shortName = cls.replace('初2028届','').replace('班','班');
+    return `<div class="prog-card">
+      <div class="prog-card-top">
+        <div class="prog-class-name">${shortName}</div>
+        <div class="prog-lesson-row">
+          <div class="prog-lesson-label">当前课时</div>
+          <input class="prog-lesson-input" type="number" min="0" max="${progTotal}"
+            value="${p.lesson}"
+            oninput="updateProgLesson('${cls}', this.value)"
+            onchange="updateProgLesson('${cls}', this.value)">
+          <div class="prog-lesson-btns">
+            <button class="prog-lesson-btn" onclick="adjustProgLesson('${cls}', -1)" title="减少 1 课时">−</button>
+            <button class="prog-lesson-btn" onclick="adjustProgLesson('${cls}', 1)" title="增加 1 课时">+</button>
+          </div>
+          <div class="prog-lesson-label">/ ${progTotal}</div>
+          <div class="prog-badge" id="prog-badge-${i}">${pct}%</div>
+        </div>
+      </div>
+      <div class="prog-lesson-row">
+        <div class="prog-lesson-label">当前内容</div>
+        <input class="prog-topic-input" type="text" placeholder="例：第3课 变量与数据类型"
+          value="${escHtml(p.topic)}"
+          oninput="updateProgTopic('${cls}', this.value)"
+          maxlength="60">
+      </div>
+      <div class="prog-bar-wrap">
+        <div class="prog-bar-bg">
+          <div class="prog-bar-fill" id="prog-bar-${i}"
+            style="width:${pct}%;background:linear-gradient(90deg,${col},${col}cc)"></div>
+        </div>
+        <div class="prog-pct" id="prog-pct-${i}" style="color:${col}">${pct}%</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function updateProgLesson(cls, val) {
+  const v = Math.max(0, Math.min(progTotal, parseInt(val)||0));
+  getClassProg(cls).lesson = v;
+  saveProg();
+  // Live-update bar & badge
+  refreshProgCard(cls);
+  renderProgCompare();
+}
+
+function adjustProgLesson(cls, delta) {
+  const p = getClassProg(cls);
+  const newLesson = Math.max(0, Math.min(progTotal, p.lesson + delta));
+  p.lesson = newLesson;
+  saveProg();
+  refreshProgCard(cls);
+  renderProgCompare();
+  renderProgCards();
+}
+
+function updateProgTopic(cls, val) {
+  getClassProg(cls).topic = val;
+  saveProg();
+}
+
+function refreshProgCard(cls) {
+  const classes = Object.keys(SEAT_DATA);
+  const i = classes.indexOf(cls);
+  if (i === -1) return;
+  const p = getClassProg(cls);
+  const pct = progTotal > 0 ? Math.min(100, Math.round(p.lesson / progTotal * 100)) : 0;
+  const col = PROG_COLORS[i % PROG_COLORS.length];
+  const barEl = document.getElementById('prog-bar-' + i);
+  const pctEl = document.getElementById('prog-pct-' + i);
+  const bdgEl = document.getElementById('prog-badge-' + i);
+  if (barEl) barEl.style.width = pct + '%';
+  if (pctEl) { pctEl.textContent = pct + '%'; pctEl.style.color = col; }
+  if (bdgEl) bdgEl.textContent = pct + '%';
+}
+
+function renderProgCompare() {
+  const classes = Object.keys(SEAT_DATA);
+  // Sort by lesson desc for ranking
+  const sorted = [...classes].map((cls, i) => ({
+    cls, i, p: getClassProg(cls)
+  })).sort((a,b) => b.p.lesson - a.p.lesson);
+
+  const maxLesson = Math.max(1, ...sorted.map(x => x.p.lesson));
+
+  const el = document.getElementById('progCompareGrid');
+  el.innerHTML = sorted.map((x, rank) => {
+    const col = PROG_COLORS[x.i % PROG_COLORS.length];
+    const barPct = maxLesson > 0 ? Math.round(x.p.lesson / maxLesson * 100) : 0;
+    const shortName = x.cls.replace('初2028届','').replace('班','班');
+    return `<div class="prog-compare-row">
+      <div class="prog-cmp-lbl" title="${x.cls}">${shortName}</div>
+      <div class="prog-cmp-bar-bg">
+        <div class="prog-cmp-fill" style="width:${barPct}%;background:${col}"></div>
+      </div>
+      <div class="prog-cmp-num" style="color:${col}">${x.p.lesson}</div>
+    </div>`;
+  }).join('');
+}
+
+// ======================== FULLSCREEN ========================
+function toggleFullscreen() {
+  const panel = document.getElementById('seatPanel');
+  const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+  if (isFs) {
+    exitFullscreen();
+  } else {
+    const req = panel.requestFullscreen || panel.webkitRequestFullscreen || panel.mozRequestFullScreen;
+    if (req) req.call(panel);
+  }
+}
+
+function exitFullscreen() {
+  const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen;
+  if (exit) exit.call(document);
+}
+
+document.addEventListener('fullscreenchange', onFullscreenChange);
+document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+document.addEventListener('mozfullscreenchange', onFullscreenChange);
+
+function onFullscreenChange() {
+  const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+  const btn = document.getElementById('fullscreenBtn');
+  if (btn) btn.textContent = isFs ? '⊠ 退出全屏' : '⛶ 全屏座位';
+}
+
+
+// ======================== 主题切换功能 ========================
+function toggleTheme() {
+  const root = document.documentElement;
+  const isLight = root.classList.contains('light');
+  const themeBtn = document.getElementById('themeToggleBtn');
+  
+  if (isLight) {
+    root.classList.remove('light');
+    themeBtn.textContent = '🌙 深色模式';
+    localStorage.setItem('theme', 'dark');
+  } else {
+    root.classList.add('light');
+    themeBtn.textContent = '☀️ 浅色模式';
+    localStorage.setItem('theme', 'light');
+  }
+}
+
+// 初始化主题
+function initTheme() {
+  // 检查本地存储中的主题偏好
+  const savedTheme = localStorage.getItem('theme');
+  const root = document.documentElement;
+  
+  if (savedTheme) {
+    if (savedTheme === 'light') {
+      root.classList.add('light');
+      document.getElementById('themeToggleBtn').textContent = '☀️ 浅色模式';
+    } else {
+      root.classList.remove('light');
+      document.getElementById('themeToggleBtn').textContent = '🌙 深色模式';
+    }
+  } else {
+    // 检测系统级深色模式偏好
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      root.classList.remove('light');
+      document.getElementById('themeToggleBtn').textContent = '🌙 深色模式';
+    } else {
+      root.classList.add('light');
+      document.getElementById('themeToggleBtn').textContent = '☀️ 浅色模式';
+    }
+  }
+}
+
+// ======================== BOOT ========================
+init();
+initTheme();
+</script>
+</body>
+</html>

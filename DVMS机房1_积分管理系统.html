@@ -213,6 +213,16 @@ main { display: flex; flex: 1; overflow: hidden; min-width: 0; min-height: 0; }
 .seat.leave { opacity: 0.5; background: rgba(100,100,100,0.1); border-color: rgba(100,100,100,0.3); }
 .seat.leave .seat-name, .seat.leave .seat-pts { color: var(--muted); }
 
+.seat.keyboard-problem {
+  border-color: rgba(248,113,113,0.4) !important;
+  background: rgba(248,113,113,0.08) !important;
+}
+
+.seat.keyboard-normal {
+  border-color: rgba(74,222,128,0.3) !important;
+  background: rgba(74,222,128,0.05) !important;
+}
+
 .seat-name { font-size: 16px; font-weight: 700; text-align: center; line-height: 1.2; }
 .seat-pts {
   font-size: 12px; font-weight: 900; margin-top: 2px;
@@ -767,6 +777,7 @@ main { display: flex; flex: 1; overflow: hidden; min-width: 0; min-height: 0; }
     <button class="hdr-btn" onclick="openProgPanel()">📈 课程进度</button>
     <button class="hdr-btn" onclick="openRollCall()">🎲 随机点名</button>
     <button class="hdr-btn" onclick="openHwPanel()">📋 作业管理</button>
+    <button class="hdr-btn" onclick="openKeyboardPanel()">⌨️ 键盘管理</button>
     <button class="hdr-btn" onclick="exportExcel()">📊 导出表格</button>
     <button class="hdr-btn" onclick="toggleFullscreen()" id="fullscreenBtn">⛶ 全屏座位</button>
     <button class="hdr-btn green" onclick="resetClassPoints()">🔄 清空本班积分</button>
@@ -851,8 +862,9 @@ main { display: flex; flex: 1; overflow: hidden; min-width: 0; min-height: 0; }
           <div class="big-score" id="stuScore">0</div>
           <div class="score-unit">分</div>
         </div>
-        <div style="margin-top:10px;">
+        <div style="margin-top:10px;display:flex;gap:8px;">
           <button id="leaveStatusBtn" onclick="toggleLeaveStatus()" style="background:rgba(192,132,252,0.1);border:1px solid rgba(192,132,252,0.3);color:var(--purple);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;">🏠 标记请假</button>
+          <button id="keyboardStatusBtn" onclick="openKeyboardModal()" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:var(--blue);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;">⌨️ 键盘状态</button>
         </div>
       </div>
 
@@ -1004,6 +1016,52 @@ main { display: flex; flex: 1; overflow: hidden; min-width: 0; min-height: 0; }
   </div>
 </div>
 
+<!-- Keyboard Status Modal -->
+<div class="modal-bg" id="keyboardModalBg">
+  <div class="modal">
+    <h3 id="keyboardModalTitle">键盘状态</h3>
+    <p id="keyboardModalMsg">请选择键盘状态</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin:12px 0;">
+      <button class="mbtn" style="background:var(--green);color:#fff;" onclick="setKeyboardStatus('normal')">✅ 正常</button>
+      <button class="mbtn" style="background:var(--red);color:#fff;" onclick="setKeyboardStatus('problem')">⚠️ 有问题</button>
+      <button class="mbtn mbtn-cancel" onclick="closeKeyboardModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- Keyboard Management Panel -->
+<div class="hw-overlay" id="keyboardOverlay" onclick="closeKeyboardPanelOutside(event)">
+  <div class="hw-panel" id="keyboardPanel" style="width:1000px;">
+    <div class="hw-panel-hdr">
+      <span style="font-size:20px;">⌨️</span>
+      <h2>键盘状态管理</h2>
+      <button class="hw-close" onclick="closeKeyboardPanel()">✕ 关闭</button>
+    </div>
+    <div class="hw-body">
+      <div style="padding:16px;display:flex;gap:16px;">
+        <div style="flex:1;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">
+            <button class="sf-btn active" onclick="setKeyboardFilter('all',this)">全部</button>
+            <button class="hw-add-btn" onclick="exportKeyboardData()" style="margin-left:auto;">📊 导出数据</button>
+          </div>
+          <div style="background:var(--card);border-radius:14px;padding:16px;border:1px solid var(--border);">
+            <h3 style="font-size:16px;font-weight:900;margin-bottom:12px;">座位视图</h3>
+            <div id="keyboardSeatView"></div>
+          </div>
+        </div>
+        <div style="width:300px;">
+          <div id="keyboardDetailPanel" style="background:var(--card);border-radius:14px;padding:16px;border:1px solid var(--border);min-height:400px;">
+            <h3 style="font-size:16px;font-weight:900;margin-bottom:12px;">座位详情</h3>
+            <div id="keyboardDetailContent" style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--muted);">
+              <p>点击座位查看详情</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ======================== DATA ========================
 const SEAT_DATA = {
@@ -1037,7 +1095,10 @@ function getColor(name) {
 let currentClass = Object.keys(SEAT_DATA)[0];
 let selectedSeat = null;
 let points = {}; // { className: { seatKey: { pts, log } } }
+let keyboardStatus = {}; // { seatKey: { current: { status, time, operator, className, studentName }, history: [{ status, time, operator, className, studentName }] } }
 let activeFilter = 'all';
+let activeKeyboardFilter = 'all';
+let selectedKeyboardSeat = null;
 
 function initPoints() {
   const saved = localStorage.getItem('machineRoomPoints_v2');
@@ -1048,6 +1109,92 @@ function initPoints() {
 
 function savePoints() {
   localStorage.setItem('machineRoomPoints_v2', JSON.stringify(points));
+}
+
+function initKeyboardStatus() {
+  const saved = localStorage.getItem('machineRoomKeyboardStatus');
+  if (saved) {
+    try { 
+      const parsed = JSON.parse(saved);
+      // 检查是否是旧的数据结构，如果是则转换为新的数据结构
+      const isOldStructure = Object.keys(parsed).some(key => typeof parsed[key] === 'object' && !parsed[key].hasOwnProperty('current'));
+      if (isOldStructure) {
+        // 转换旧的数据结构为新的数据结构
+        const newKeyboardStatus = {};
+        for (const className in parsed) {
+          if (parsed.hasOwnProperty(className)) {
+            for (const seatKey in parsed[className]) {
+              if (parsed[className].hasOwnProperty(seatKey)) {
+                const statusInfo = parsed[className][seatKey];
+                if (!newKeyboardStatus[seatKey]) {
+                  newKeyboardStatus[seatKey] = {
+                    current: {
+                      ...statusInfo,
+                      className: className,
+                      studentName: SEAT_DATA[className] ? SEAT_DATA[className][seatKey] : '未知'
+                    },
+                    history: [{
+                      ...statusInfo,
+                      className: className,
+                      studentName: SEAT_DATA[className] ? SEAT_DATA[className][seatKey] : '未知'
+                    }]
+                  };
+                } else {
+                  // 如果座位已经存在，将当前状态添加到历史记录
+                  newKeyboardStatus[seatKey].history.push({
+                    ...statusInfo,
+                    className: className,
+                    studentName: SEAT_DATA[className] ? SEAT_DATA[className][seatKey] : '未知'
+                  });
+                  // 如果当前状态是异常，更新当前状态
+                  if (statusInfo.status === 'problem') {
+                    newKeyboardStatus[seatKey].current = {
+                      ...statusInfo,
+                      className: className,
+                      studentName: SEAT_DATA[className] ? SEAT_DATA[className][seatKey] : '未知'
+                    };
+                  }
+                }
+              }
+            }
+          }
+        }
+        keyboardStatus = newKeyboardStatus;
+        saveKeyboardStatus(); // 保存转换后的数据
+      } else {
+        keyboardStatus = parsed;
+      }
+    } catch(e) { keyboardStatus = {}; }
+  }
+}
+
+function saveKeyboardStatus() {
+  localStorage.setItem('machineRoomKeyboardStatus', JSON.stringify(keyboardStatus));
+}
+
+function getClassKeyboardStatus(cls) {
+  // 从新的数据结构中获取指定班级的键盘状态
+  const classStatus = {};
+  for (const seatKey in keyboardStatus) {
+    if (keyboardStatus.hasOwnProperty(seatKey)) {
+      const seatStatus = keyboardStatus[seatKey];
+      if (seatStatus.current.className === cls) {
+        classStatus[seatKey] = seatStatus.current;
+      }
+    }
+  }
+  return classStatus;
+}
+
+function getSeatKeyboardStatus(cls, seat) {
+  // 从新的数据结构中获取指定座位的键盘状态
+  if (!keyboardStatus[seat]) {
+    keyboardStatus[seat] = {
+      current: { status: 'unknown', time: '', operator: '', className: cls, studentName: SEAT_DATA[cls] ? SEAT_DATA[cls][seat] : '未知' },
+      history: []
+    };
+  }
+  return keyboardStatus[seat].current;
 }
 
 function getClassPoints(cls) {
@@ -1064,6 +1211,7 @@ function getSeatData(cls, seat) {
 // ======================== INIT ========================
 function init() {
   initPoints();
+  initKeyboardStatus();
   initHw();
   initProg();
   buildClassTabs();
@@ -1263,6 +1411,24 @@ function renderDetail() {
     leaveBtn.style.color = 'var(--purple)';
   }
 
+  // Update keyboard status display
+  const keyboardBtn = document.getElementById('keyboardStatusBtn');
+  const keyboardInfo = keyboardStatus[selectedSeat] ? keyboardStatus[selectedSeat].current : { status: 'unknown', time: '', operator: '', className: '', studentName: '' };
+  let statusText = '键盘正常';
+  let statusColor = 'var(--green)';
+  let statusBg = 'rgba(74,222,128,0.1)';
+  
+  if (keyboardInfo.status === 'problem') {
+    statusText = '键盘异常';
+    statusColor = 'var(--red)';
+    statusBg = 'rgba(248,113,113,0.1)';
+  }
+  
+  keyboardBtn.textContent = `⌨️ ${statusText}`;
+  keyboardBtn.style.background = statusBg;
+  keyboardBtn.style.borderColor = `${statusColor}40`;
+  keyboardBtn.style.color = statusColor;
+
   // Log
   const logList = document.getElementById('logList');
   if (!sd.log.length) {
@@ -1297,6 +1463,344 @@ function selectSeat(key) {
   document.getElementById('customForm').classList.remove('show');
   renderSeats();
   renderDetail();
+}
+
+// ======================== KEYBOARD STATUS ========================
+function openKeyboardModal() {
+  if (!selectedSeat) return;
+  document.getElementById('keyboardModalBg').classList.add('show');
+}
+
+function closeKeyboardModal() {
+  document.getElementById('keyboardModalBg').classList.remove('show');
+}
+
+function setKeyboardStatus(status) {
+  if (!selectedSeat) return;
+  
+  const now = new Date().toLocaleString('zh-CN', { 
+    year: 'numeric', 
+    month: '2-digit', 
+    day: '2-digit',
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit'
+  });
+  
+  const statusInfo = {
+    status: status,
+    time: now,
+    operator: '管理员',
+    className: currentClass,
+    studentName: SEAT_DATA[currentClass] ? SEAT_DATA[currentClass][selectedSeat] : '未知'
+  };
+  
+  if (!keyboardStatus[selectedSeat]) {
+    keyboardStatus[selectedSeat] = {
+      current: statusInfo,
+      history: [statusInfo]
+    };
+  } else {
+    keyboardStatus[selectedSeat].current = statusInfo;
+    keyboardStatus[selectedSeat].history.push(statusInfo);
+  }
+  
+  saveKeyboardStatus();
+  renderSeats();
+  closeKeyboardModal();
+  showToast(status === 'normal' ? '键盘状态已标记为正常' : '键盘状态已标记为有问题');
+}
+
+function openKeyboardPanel() {
+  document.getElementById('keyboardOverlay').classList.add('show');
+  renderKeyboardSeatView();
+}
+
+function closeKeyboardPanel() {
+  document.getElementById('keyboardOverlay').classList.remove('show');
+  selectedKeyboardSeat = null;
+  // 重置详情面板内容
+  const detailContent = document.getElementById('keyboardDetailContent');
+  detailContent.style.display = 'flex';
+  detailContent.style.alignItems = 'center';
+  detailContent.style.justifyContent = 'center';
+  detailContent.style.height = '300px';
+  detailContent.innerHTML = '<p>点击座位查看详情</p>';
+}
+
+function closeKeyboardPanelOutside(event) {
+  if (event.target === document.getElementById('keyboardOverlay')) {
+    closeKeyboardPanel();
+  }
+}
+
+function renderKeyboardSeatView() {
+  // 获取所有可能的座位（基于最大行和列）
+  const maxRow = 9; // 假设最大行数为9
+  const layout = buildLayout();
+  const gridTemplate = getGridTemplate(layout);
+
+  const seatView = document.getElementById('keyboardSeatView');
+  seatView.innerHTML = '';
+
+  // 列标签
+  const colLabels = document.createElement('div');
+  colLabels.style.display = 'grid';
+  colLabels.style.gridTemplateColumns = getGridTemplate(layout);
+  colLabels.style.gap = '6px';
+  colLabels.style.marginBottom = '8px';
+  for (const col of layout) {
+    if (col === '|') {
+      const div = document.createElement('div');
+      colLabels.appendChild(div);
+    } else {
+      const div = document.createElement('div');
+      div.className = 'col-lbl';
+      div.textContent = col;
+      colLabels.appendChild(div);
+    }
+  }
+  seatView.appendChild(colLabels);
+
+  // 座位网格
+  for (let r = maxRow; r >= 1; r--) {
+    const row = document.createElement('div');
+    row.style.display = 'grid';
+    row.style.gridTemplateColumns = gridTemplate;
+    row.style.gap = '6px';
+    row.style.marginBottom = '6px';
+
+    for (const col of layout) {
+      if (col === '|') {
+        const aisle = document.createElement('div');
+        aisle.className = 'aisle';
+        aisle.innerHTML = '<div class="aisle-dot"></div>';
+        row.appendChild(aisle);
+        continue;
+      }
+      const key = `${col}${r}`;
+      const div = document.createElement('div');
+
+      // 获取键盘状态信息
+      const keyboardInfo = keyboardStatus[key] ? keyboardStatus[key].current : { status: 'normal', time: '', operator: '', className: '', studentName: '' };
+      let statusClass = '';
+      let statusText = '正常';
+      let statusColor = 'var(--green)';
+      let statusBg = 'rgba(74,222,128,0.1)';
+
+      if (keyboardInfo.status === 'problem') {
+        statusClass = 'keyboard-problem';
+        statusText = '异常';
+        statusColor = 'var(--red)';
+        statusBg = 'rgba(248,113,113,0.1)';
+      }
+
+
+
+      div.className = `seat ${statusClass}`;
+      div.style.cursor = 'pointer';
+      div.onclick = () => showKeyboardDetail(key);
+
+      div.innerHTML = `
+        <div class="seat-tag">${key}</div>
+        <div style="font-size:11px;font-weight:800;margin-top:8px;padding:2px 6px;border-radius:5px;color:${statusColor};background:${statusBg};">
+          ${statusText}
+        </div>
+      `;
+      row.appendChild(div);
+    }
+    seatView.appendChild(row);
+  }
+}
+
+function showKeyboardDetail(seat) {
+  selectedKeyboardSeat = seat;
+  const keyboardData = keyboardStatus[seat] || {
+    current: { status: 'normal', time: '', operator: '', className: '', studentName: '' },
+    history: []
+  };
+  
+  const currentInfo = keyboardData.current;
+  let statusText = '✅ 正常';
+  let statusColor = 'var(--green)';
+  
+  if (currentInfo.status === 'problem') {
+    statusText = '⚠️ 异常';
+    statusColor = 'var(--red)';
+  }
+  
+  // 查找最后一次坏的状态
+  const problemHistory = keyboardData.history.filter(item => item.status === 'problem').reverse();
+  const lastProblem = problemHistory.length > 0 ? problemHistory[0] : null;
+  
+  // 构建历史记录HTML（只显示异常记录）
+  let historyHtml = '';
+  const filteredHistory = keyboardData.history.filter(item => item.status === 'problem');
+  if (filteredHistory.length > 0) {
+    historyHtml = `
+      <div style="margin-top:16px;">
+        <h4 style="font-size:14px;font-weight:800;margin-bottom:8px;">异常历史记录</h4>
+        <div style="max-height:150px;overflow-y:auto;">
+          ${filteredHistory.reverse().map((item, index) => {
+            let itemStatusText = '⚠️ 异常';
+            let itemStatusColor = 'var(--red)';
+            return `
+              <div style="padding:6px;background:var(--card2);border-radius:6px;margin-bottom:4px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-weight:700;font-size:12px;">${index + 1}.</span>
+                  <span style="color:${itemStatusColor};font-weight:800;font-size:12px;">${itemStatusText}</span>
+                  <span style="font-size:10px;color:var(--muted);">${item.time}</span>
+                </div>
+                <div style="font-size:11px;margin-top:3px;">
+                  <span>班级：${item.className || '未知'}</span><br>
+                  <span>学生：${item.studentName || '未知'}</span>
+                  ${item.description ? `<br><span style="color:${itemStatusColor};">描述：${item.description}</span>` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
+  // 添加自定义异常描述输入框
+  let descriptionInputHtml = '';
+  if (statusText === '⚠️ 异常') {
+    descriptionInputHtml = `
+      <div style="margin-top:12px;">
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">异常描述：</label>
+        <textarea id="problemDescription" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;"></textarea>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;">请输入具体的异常情况</div>
+      </div>
+    `;
+  }
+  
+  // 更新详情面板内容
+  const detailContent = document.getElementById('keyboardDetailContent');
+  detailContent.style.display = 'flex';
+  detailContent.style.flexDirection = 'column';
+  detailContent.style.alignItems = 'flex-start';
+  detailContent.style.justifyContent = 'flex-start';
+  detailContent.style.height = 'auto';
+  detailContent.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px;width:100%;">
+      <div style="display:flex;justify-content:space-between;width:100%;">
+        <span style="font-weight:700;">座位：</span>
+        <span>${seat}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;width:100%;">
+        <span style="font-weight:700;">当前状态：</span>
+        <span style="color:${statusColor};font-weight:800;">${statusText}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;width:100%;">
+        <span style="font-weight:700;">最后检查时间：</span>
+        <span>${currentInfo.time || '未设置'}</span>
+      </div>
+      ${lastProblem ? `
+        <div style="margin-top:8px;padding:10px;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);border-radius:8px;width:100%;">
+          <h4 style="font-size:14px;font-weight:800;margin-bottom:6px;color:var(--red);">最后一次异常记录</h4>
+          <div style="font-size:12px;">
+            <span>时间：${lastProblem.time}</span><br>
+            <span>班级：${lastProblem.className}</span><br>
+            <span>学生：${lastProblem.studentName}</span>
+            ${lastProblem.description ? `<br><span>描述：${lastProblem.description}</span>` : ''}
+          </div>
+        </div>
+      ` : ''}
+      ${historyHtml}
+      ${descriptionInputHtml}
+      <div style="margin-top:16px;display:flex;gap:8px;width:100%;">
+        <button class="mbtn" style="flex:1;background:var(--green);color:#fff;" onclick="updateKeyboardStatus('normal');">✅ 标记为正常</button>
+        <button class="mbtn" style="flex:1;background:var(--red);color:#fff;" onclick="updateKeyboardStatus('problem');">⚠️ 标记为异常</button>
+      </div>
+    </div>
+  `;
+}
+
+function setKeyboardFilter(filter, el) {
+  activeKeyboardFilter = filter;
+  document.querySelectorAll('#keyboardOverlay .sf-btn').forEach(btn => btn.classList.remove('active'));
+  el.classList.add('active');
+  renderKeyboardSeatView();
+}
+
+function sortKeyboardData(type) {
+  showToast('已按时间排序');
+  renderKeyboardSeatView();
+}
+
+function updateKeyboardStatus(status) {
+  if (!selectedKeyboardSeat) return;
+  
+  const now = new Date().toLocaleString('zh-CN', { 
+    year: 'numeric', 
+    month: '2-digit', 
+    day: '2-digit',
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit'
+  });
+  
+  // 获取异常描述
+  let description = '';
+  if (status === 'problem') {
+    const descriptionInput = document.getElementById('problemDescription');
+    if (descriptionInput) {
+      description = descriptionInput.value.trim();
+    }
+  }
+  
+  const statusInfo = {
+    status: status,
+    time: now,
+    operator: '管理员',
+    className: currentClass,
+    studentName: SEAT_DATA[currentClass] ? SEAT_DATA[currentClass][selectedKeyboardSeat] : '未知',
+    description: description
+  };
+  
+  if (!keyboardStatus[selectedKeyboardSeat]) {
+    keyboardStatus[selectedKeyboardSeat] = {
+      current: statusInfo,
+      history: [statusInfo]
+    };
+  } else {
+    keyboardStatus[selectedKeyboardSeat].current = statusInfo;
+    keyboardStatus[selectedKeyboardSeat].history.push(statusInfo);
+  }
+  
+  saveKeyboardStatus();
+  renderKeyboardSeatView();
+  showKeyboardDetail(selectedKeyboardSeat); // 更新详情面板
+  showToast(status === 'normal' ? '键盘状态已更新为正常' : '键盘状态已更新为异常');
+  renderSeats(); // 更新主界面的座位状态
+  renderDetail(); // 更新右侧详情面板
+}
+
+function exportKeyboardData() {
+  const cks = getClassKeyboardStatus(currentClass);
+  const seats = SEAT_DATA[currentClass];
+  let data = [];
+  
+  for (const [seat, info] of Object.entries(seats)) {
+    const keyboardInfo = cks[seat] || { status: '未知', time: '', operator: '' };
+    data.push({
+      '座位编号': seat,
+      '学生姓名': info,
+      '键盘状态': keyboardInfo.status === 'normal' ? '正常' : keyboardInfo.status === 'problem' ? '异常' : '未知',
+      '最后检查时间': keyboardInfo.time || '未设置',
+      '操作人': keyboardInfo.operator || '未知'
+    });
+  }
+  
+  // 使用xlsx库导出Excel
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '键盘状态');
+  XLSX.writeFile(wb, `${currentClass}_键盘状态_${new Date().toISOString().slice(0,10)}.xlsx`);
+  
+  showToast('数据导出成功');
 }
 
 function quickPts(delta, type) {

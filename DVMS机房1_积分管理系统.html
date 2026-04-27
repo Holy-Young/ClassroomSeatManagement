@@ -1021,7 +1021,12 @@ main { display: flex; flex: 1; overflow: hidden; min-width: 0; min-height: 0; }
   <div class="modal">
     <h3 id="keyboardModalTitle">键盘状态</h3>
     <p id="keyboardModalMsg">请选择键盘状态</p>
-    <div style="display:flex;flex-direction:column;gap:8px;margin:12px 0;">
+    <div style="margin:12px 0;">
+      <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">异常描述（可选）：</label>
+      <textarea id="keyboardModalDescription" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;"></textarea>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px;">如标记为有问题，请填写具体问题</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
       <button class="mbtn" style="background:var(--green);color:#fff;" onclick="setKeyboardStatus('normal')">✅ 正常</button>
       <button class="mbtn" style="background:var(--red);color:#fff;" onclick="setKeyboardStatus('problem')">⚠️ 有问题</button>
       <button class="mbtn mbtn-cancel" onclick="closeKeyboardModal()">取消</button>
@@ -1487,12 +1492,20 @@ function setKeyboardStatus(status) {
     second: '2-digit'
   });
   
+  // 获取异常描述（如果模态框中有输入框）
+  let description = '';
+  const descriptionInput = document.getElementById('keyboardModalDescription');
+  if (descriptionInput) {
+    description = descriptionInput.value.trim();
+  }
+  
   const statusInfo = {
     status: status,
     time: now,
     operator: '管理员',
     className: currentClass,
-    studentName: SEAT_DATA[currentClass] ? SEAT_DATA[currentClass][selectedSeat] : '未知'
+    studentName: SEAT_DATA[currentClass] ? SEAT_DATA[currentClass][selectedSeat] : '未知',
+    description: description
   };
   
   if (!keyboardStatus[selectedSeat]) {
@@ -1633,28 +1646,28 @@ function showKeyboardDetail(seat) {
   const problemHistory = keyboardData.history.filter(item => item.status === 'problem').reverse();
   const lastProblem = problemHistory.length > 0 ? problemHistory[0] : null;
   
-  // 构建历史记录HTML（只显示异常记录）
+  // 构建历史记录HTML（显示所有记录，包括正常和异常）
   let historyHtml = '';
-  const filteredHistory = keyboardData.history.filter(item => item.status === 'problem');
-  if (filteredHistory.length > 0) {
+  if (keyboardData.history.length > 0) {
     historyHtml = `
       <div style="margin-top:16px;">
-        <h4 style="font-size:14px;font-weight:800;margin-bottom:8px;">异常历史记录</h4>
-        <div style="max-height:150px;overflow-y:auto;">
-          ${filteredHistory.reverse().map((item, index) => {
-            let itemStatusText = '⚠️ 异常';
-            let itemStatusColor = 'var(--red)';
+        <h4 style="font-size:14px;font-weight:800;margin-bottom:8px;">完整历史记录</h4>
+        <div style="max-height:200px;overflow-y:auto;">
+          ${keyboardData.history.slice().reverse().map((item, index) => {
+            const isProblem = item.status === 'problem';
+            const statusText = isProblem ? '⚠️ 异常' : '✅ 正常';
+            const statusColor = isProblem ? 'var(--red)' : 'var(--green)';
             return `
-              <div style="padding:6px;background:var(--card2);border-radius:6px;margin-bottom:4px;">
+              <div style="padding:6px;background:var(--card2);border-radius:6px;margin-bottom:4px;border-left:3px solid ${statusColor};">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                   <span style="font-weight:700;font-size:12px;">${index + 1}.</span>
-                  <span style="color:${itemStatusColor};font-weight:800;font-size:12px;">${itemStatusText}</span>
+                  <span style="color:${statusColor};font-weight:800;font-size:12px;">${statusText}</span>
                   <span style="font-size:10px;color:var(--muted);">${item.time}</span>
                 </div>
                 <div style="font-size:11px;margin-top:3px;">
                   <span>班级：${item.className || '未知'}</span><br>
                   <span>学生：${item.studentName || '未知'}</span>
-                  ${item.description ? `<br><span style="color:${itemStatusColor};">描述：${item.description}</span>` : ''}
+                  ${item.description ? `<br><span style="color:${isProblem ? 'var(--red)' : 'var(--text)'};">描述：${item.description}</span>` : ''}
                 </div>
               </div>
             `;
@@ -1664,17 +1677,14 @@ function showKeyboardDetail(seat) {
     `;
   }
   
-  // 添加自定义异常描述输入框
-  let descriptionInputHtml = '';
-  if (statusText === '⚠️ 异常') {
-    descriptionInputHtml = `
-      <div style="margin-top:12px;">
-        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">异常描述：</label>
-        <textarea id="problemDescription" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;"></textarea>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px;">请输入具体的异常情况</div>
-      </div>
-    `;
-  }
+  // 添加异常描述输入框（始终显示）
+  const descriptionInputHtml = `
+    <div style="margin-top:12px;">
+      <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">异常描述：</label>
+      <textarea id="problemDescription" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;"></textarea>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px;">如标记为异常，请填写具体问题（如：某几个键失灵、键帽脱落等）</div>
+    </div>
+  `;
   
   // 更新详情面板内容
   const detailContent = document.getElementById('keyboardDetailContent');
@@ -1708,8 +1718,8 @@ function showKeyboardDetail(seat) {
           </div>
         </div>
       ` : ''}
-      ${historyHtml}
       ${descriptionInputHtml}
+      ${historyHtml}
       <div style="margin-top:16px;display:flex;gap:8px;width:100%;">
         <button class="mbtn" style="flex:1;background:var(--green);color:#fff;" onclick="updateKeyboardStatus('normal');">✅ 标记为正常</button>
         <button class="mbtn" style="flex:1;background:var(--red);color:#fff;" onclick="updateKeyboardStatus('problem');">⚠️ 标记为异常</button>
@@ -1742,13 +1752,11 @@ function updateKeyboardStatus(status) {
     second: '2-digit'
   });
   
-  // 获取异常描述
+  // 获取异常描述（无论标记为正常还是异常，都获取描述内容）
   let description = '';
-  if (status === 'problem') {
-    const descriptionInput = document.getElementById('problemDescription');
-    if (descriptionInput) {
-      description = descriptionInput.value.trim();
-    }
+  const descriptionInput = document.getElementById('problemDescription');
+  if (descriptionInput) {
+    description = descriptionInput.value.trim();
   }
   
   const statusInfo = {
